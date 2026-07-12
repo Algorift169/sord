@@ -3,7 +3,7 @@
 #include <filesystem>
 #include <string>
 
-#include "editor/document.hpp"
+#include "../editor/document.hpp"
 
 namespace sord {
 namespace app {

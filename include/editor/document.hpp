@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "editor/page_manager.hpp"
+#include "page_manager.hpp"
 
 namespace sord {
 namespace editor {

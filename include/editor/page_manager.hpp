@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <vector>
 
-#include "editor/page.hpp"
+#include "page.hpp"
 
 namespace sord {
 namespace editor {

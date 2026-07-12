@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
-#include "editor/editor.hpp"
-#include "renderer/page_renderer.hpp"
+#include "../editor/editor.hpp"
+#include "page_renderer.hpp"
 
 namespace sord {
 namespace renderer {

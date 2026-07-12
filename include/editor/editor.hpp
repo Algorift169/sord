@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "editor/document.hpp"
+#include "document.hpp"
 
 namespace sord {
 namespace editor {

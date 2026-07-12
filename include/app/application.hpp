@@ -10,8 +10,8 @@
 #include <vector>
 
 #include <ftxui/component/screen_interactive.hpp>
-#include "editor/editor.hpp"
-#include "renderer/editor_renderer.hpp"
+#include "../editor/editor.hpp"
+#include "../renderer/editor_renderer.hpp"
 
 namespace sord {
 namespace app {
