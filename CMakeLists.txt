@@ -12,8 +12,12 @@ pkg_check_modules(FTXUI REQUIRED IMPORTED_TARGET ftxui)
 
 add_executable(sord
     src/main.cpp
+    src/editor/page.cpp
+    src/editor/page_manager.cpp
     src/editor/document.cpp
     src/editor/editor.cpp
+    src/layout/page_layout.cpp
+    src/renderer/page_renderer.cpp
     src/renderer/editor_renderer.cpp
     src/app/application.cpp
 )
@@ -23,6 +27,8 @@ target_link_libraries(sord PRIVATE PkgConfig::FTXUI)
 
 add_executable(sord_tests
     tests/document_test.cpp
+    src/editor/page.cpp
+    src/editor/page_manager.cpp
     src/editor/document.cpp
 )
 

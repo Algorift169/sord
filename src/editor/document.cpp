@@ -6,9 +6,7 @@
 namespace sord {
 namespace editor {
 
-Document::Document(std::string title) : title_(std::move(title)) {
-    lines_.emplace_back();
-}
+Document::Document(std::string title) : title_(std::move(title)) {}
 
 void Document::insert_char(char ch) {
     if (ch == '\n') {
@@ -16,11 +14,13 @@ void Document::insert_char(char ch) {
         return;
     }
 
-    if (cursor_row_ >= lines_.size()) {
-        lines_.emplace_back();
+    auto& current_page = page_manager_.page(current_page_);
+    auto& lines = current_page.lines();
+    if (cursor_row_ >= lines.size()) {
+        lines.emplace_back();
     }
 
-    auto& line = lines_[cursor_row_];
+    auto& line = lines[cursor_row_];
     if (cursor_column_ > line.size()) {
         cursor_column_ = line.size();
     }
@@ -29,23 +29,27 @@ void Document::insert_char(char ch) {
 }
 
 void Document::insert_newline() {
-    if (cursor_row_ >= lines_.size()) {
-        lines_.emplace_back();
+    auto& current_page = page_manager_.page(current_page_);
+    auto& lines = current_page.lines();
+    if (cursor_row_ >= lines.size()) {
+        lines.emplace_back();
     }
 
-    auto& current = lines_[cursor_row_];
+    auto& current = lines[cursor_row_];
     if (cursor_column_ > current.size()) {
         cursor_column_ = current.size();
     }
 
     std::string rest = current.substr(cursor_column_);
     current.erase(cursor_column_);
-    lines_.insert(lines_.begin() + static_cast<std::ptrdiff_t>(cursor_row_ + 1), std::move(rest));
+    lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(cursor_row_ + 1), std::move(rest));
     cursor_row_ += 1;
     cursor_column_ = 0;
 }
 
 void Document::backspace() {
+    auto& current_page = page_manager_.page(current_page_);
+    auto& lines = current_page.lines();
     if (cursor_row_ == 0 && cursor_column_ == 0) {
         return;
     }
@@ -54,36 +58,77 @@ void Document::backspace() {
         if (cursor_row_ == 0) {
             return;
         }
-        auto& previous = lines_[cursor_row_ - 1];
-        previous += lines_[cursor_row_];
-        lines_.erase(lines_.begin() + static_cast<std::ptrdiff_t>(cursor_row_));
+        auto& previous = lines[cursor_row_ - 1];
+        previous += lines[cursor_row_];
+        lines.erase(lines.begin() + static_cast<std::ptrdiff_t>(cursor_row_));
         --cursor_row_;
         cursor_column_ = previous.size();
         return;
     }
 
-    auto& line = lines_[cursor_row_];
+    auto& line = lines[cursor_row_];
     line.erase(line.begin() + static_cast<std::ptrdiff_t>(cursor_column_ - 1));
     --cursor_column_;
 }
 
 void Document::move_cursor(int row_delta, int col_delta) {
-    long long new_row = static_cast<long long>(cursor_row_) + row_delta;
-    long long new_col = static_cast<long long>(cursor_column_) + col_delta;
-
-    new_row = std::clamp(new_row, 0LL, static_cast<long long>(lines_.size() - 1));
-    if (new_row != static_cast<long long>(cursor_row_)) {
-        cursor_row_ = static_cast<std::size_t>(new_row);
-        cursor_column_ = std::min(static_cast<std::size_t>(new_col), lines_[cursor_row_].size());
+    if (row_delta < 0 && cursor_row_ == 0 && current_page_ > 0) {
+        --current_page_;
+        auto& previous_lines = page_manager_.page(current_page_).lines();
+        cursor_row_ = previous_lines.empty() ? 0 : previous_lines.size() - 1;
+        cursor_column_ = std::min(cursor_column_, previous_lines[cursor_row_].size());
         return;
     }
 
-    new_col = std::clamp(new_col, 0LL, static_cast<long long>(lines_[cursor_row_].size()));
+    auto& current_page = page_manager_.page(current_page_);
+    auto& lines = current_page.lines();
+    if (row_delta > 0 && cursor_row_ + 1 >= lines.size() && current_page_ + 1 < page_manager_.size()) {
+        ++current_page_;
+        cursor_row_ = 0;
+        auto& next_lines = page_manager_.page(current_page_).lines();
+        cursor_column_ = std::min(cursor_column_, next_lines[cursor_row_].size());
+        return;
+    }
+
+    long long new_row = static_cast<long long>(cursor_row_) + row_delta;
+    long long new_col = static_cast<long long>(cursor_column_) + col_delta;
+
+    new_row = std::clamp(new_row, 0LL, static_cast<long long>(lines.size() - 1));
+    if (new_row != static_cast<long long>(cursor_row_)) {
+        cursor_row_ = static_cast<std::size_t>(new_row);
+        cursor_column_ = std::min(static_cast<std::size_t>(new_col), lines[cursor_row_].size());
+        return;
+    }
+
+    new_col = std::clamp(new_col, 0LL, static_cast<long long>(lines[cursor_row_].size()));
     cursor_column_ = static_cast<std::size_t>(new_col);
 }
 
 const std::vector<std::string>& Document::lines() const {
-    return lines_;
+    return page_manager_.page(current_page_).lines();
+}
+
+void Document::add_page() {
+    page_manager_.add_page(page_manager_.size());
+    current_page_ = page_manager_.size() - 1;
+    cursor_row_ = 0;
+    cursor_column_ = 0;
+}
+
+std::vector<Page>& Document::pages() {
+    return page_manager_.pages();
+}
+
+const std::vector<Page>& Document::pages() const {
+    return page_manager_.pages();
+}
+
+std::size_t Document::page_count() const {
+    return page_manager_.size();
+}
+
+std::size_t Document::current_page() const {
+    return current_page_;
 }
 
 std::size_t Document::cursor_row() const {
@@ -103,11 +148,13 @@ void Document::set_title(std::string title) {
 }
 
 void Document::normalize_cursor() {
-    if (cursor_row_ >= lines_.size()) {
-        cursor_row_ = lines_.size() - 1;
+    auto& current_page = page_manager_.page(current_page_);
+    auto& lines = current_page.lines();
+    if (cursor_row_ >= lines.size()) {
+        cursor_row_ = lines.size() - 1;
     }
-    if (cursor_column_ > lines_[cursor_row_].size()) {
-        cursor_column_ = lines_[cursor_row_].size();
+    if (cursor_column_ > lines[cursor_row_].size()) {
+        cursor_column_ = lines[cursor_row_].size();
     }
 }
 

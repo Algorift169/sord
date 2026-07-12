@@ -15,14 +15,20 @@ TEST_BIN := $(BUILD_DIR)/sord_tests
 
 SORD_OBJS := \
 	$(OBJ_DIR)/main.o \
+	$(OBJ_DIR)/editor/page.o \
+	$(OBJ_DIR)/editor/page_manager.o \
 	$(OBJ_DIR)/editor/document.o \
 	$(OBJ_DIR)/editor/editor.o \
+	$(OBJ_DIR)/layout/page_layout.o \
+	$(OBJ_DIR)/renderer/page_renderer.o \
 	$(OBJ_DIR)/renderer/editor_renderer.o \
 	$(OBJ_DIR)/app/application.o \
 	$(OBJ_DIR)/app/save_manager.o
 
 TEST_OBJS := \
 	$(OBJ_DIR)/tests/document_test.o \
+	$(OBJ_DIR)/editor/page.o \
+	$(OBJ_DIR)/editor/page_manager.o \
 	$(OBJ_DIR)/editor/document.o
 
 .PHONY: all test run clean distclean
@@ -36,11 +42,27 @@ $(OBJ_DIR)/main.o: $(SRC_DIR)/main.cpp $(INCLUDE_DIR)/app/application.hpp | $(OB
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
+$(OBJ_DIR)/editor/page.o: $(SRC_DIR)/editor/page.cpp $(INCLUDE_DIR)/editor/page.hpp | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/editor/page_manager.o: $(SRC_DIR)/editor/page_manager.cpp $(INCLUDE_DIR)/editor/page_manager.hpp | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+
 $(OBJ_DIR)/editor/document.o: $(SRC_DIR)/editor/document.cpp $(INCLUDE_DIR)/editor/document.hpp | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/editor/editor.o: $(SRC_DIR)/editor/editor.cpp $(INCLUDE_DIR)/editor/editor.hpp | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/layout/page_layout.o: $(SRC_DIR)/layout/page_layout.cpp $(INCLUDE_DIR)/layout/page_layout.hpp | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/renderer/page_renderer.o: $(SRC_DIR)/renderer/page_renderer.cpp $(INCLUDE_DIR)/renderer/page_renderer.hpp | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 

@@ -117,9 +117,15 @@ int Application::run() {
         screen.PostEvent(Event::Custom);
     }, title_btn_option);
 
+    auto btn_new_page = Button("+", [&] {
+        editor_->document().add_page();
+        screen.PostEvent(Event::Custom);
+    }, title_btn_option);
+
     auto title_bar_container = Container::Horizontal({
         btn_save,
         btn_save_as,
+        btn_new_page,
     });
 
     auto title_bar = Renderer(title_bar_container, [&] {
@@ -129,6 +135,8 @@ int Application::run() {
             btn_save->Render(),
             text(" "),
             btn_save_as->Render(),
+            text(" "),
+            btn_new_page->Render(),
             filler(),
             text(current_filename()),
             text(" "),
@@ -352,6 +360,19 @@ int Application::run() {
             editor_->handle_input(261);
             screen.PostEvent(Event::Custom);
             return true;
+        }
+        if (event.is_mouse()) {
+            const auto& mouse = event.mouse();
+            if (mouse.button == Mouse::WheelUp) {
+                editor_->handle_input(259);
+                screen.PostEvent(Event::Custom);
+                return true;
+            }
+            if (mouse.button == Mouse::WheelDown) {
+                editor_->handle_input(258);
+                screen.PostEvent(Event::Custom);
+                return true;
+            }
         }
         if (event == Event::Escape) {
             screen.Exit();

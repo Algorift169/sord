@@ -6,7 +6,8 @@
 namespace sord {
 namespace renderer {
 
-EditorRenderer::EditorRenderer(std::shared_ptr<sord::editor::Editor> editor) : editor_(std::move(editor)) {}
+EditorRenderer::EditorRenderer(std::shared_ptr<sord::editor::Editor> editor)
+    : editor_(std::move(editor)), page_renderer_(sord::layout::PageLayout(80, 24, 2, 1)) {}
 
 std::string EditorRenderer::render_title_bar() const {
     std::ostringstream oss;
@@ -28,48 +29,43 @@ std::string EditorRenderer::render_status_bar() const {
     return oss.str();
 }
 
+static std::string CreatePageSeparator(std::size_t width) {
+    return std::string(width, '_');
+}
+
 std::string EditorRenderer::render_content() const {
-    const auto& lines = editor_->document().lines();
     std::ostringstream oss;
-    for (std::size_t i = 0; i < lines.size(); ++i) {
-        if (i != 0) {
-            oss << '\n';
+    const auto& pages = editor_->document().pages();
+    for (std::size_t page_index = 0; page_index < pages.size(); ++page_index) {
+        if (page_index != 0) {
+            oss << '\n' << CreatePageSeparator(80) << '\n';
         }
-        oss << lines[i];
+        for (std::size_t i = 0; i < pages[page_index].lines().size(); ++i) {
+            if (i != 0) {
+                oss << '\n';
+            }
+            oss << pages[page_index].lines()[i];
+        }
     }
     return oss.str();
 }
 
 std::vector<std::string> EditorRenderer::render_visible_lines(std::size_t width, std::size_t height) const {
-    const auto& lines = editor_->document().lines();
+    std::vector<std::string> visible;
+    const auto& pages = editor_->document().pages();
+    const auto current_page = editor_->document().current_page();
     const auto cursor_row = editor_->document().cursor_row();
     const auto cursor_col = editor_->document().cursor_column();
 
-    std::size_t start_row = 0;
-    if (lines.size() > height) {
-        start_row = std::min(cursor_row, lines.size() - height);
-    }
-
-    std::vector<std::string> visible;
-    for (std::size_t i = start_row; i < std::min(lines.size(), start_row + height); ++i) {
-        std::string line = lines[i];
-        if (line.size() > width) {
-            std::size_t start_col = 0;
-            if (i == cursor_row && cursor_col >= width) {
-                start_col = cursor_col - width + 1;
-            }
-            line = line.substr(start_col, width);
+    for (std::size_t page_index = 0; page_index < pages.size(); ++page_index) {
+        if (page_index != 0) {
+            visible.push_back(CreatePageSeparator(width));
         }
 
-        if (i == cursor_row) {
-            if (cursor_col < line.size()) {
-                line.insert(cursor_col, "█");
-            } else {
-                line += "█";
-            }
-        }
-
-        visible.push_back(line);
+        auto page_lines = page_renderer_.render(pages[page_index], width, height,
+                                               page_index == current_page ? cursor_row : std::size_t(-1),
+                                               cursor_col);
+        visible.insert(visible.end(), page_lines.begin(), page_lines.end());
     }
 
     if (visible.empty()) {

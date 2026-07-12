@@ -15,6 +15,9 @@ int main() {
     assert(doc.lines()[1] == "!");
     assert(doc.cursor_row() == 1);
     assert(doc.cursor_column() == 1);
+    assert(doc.pages().size() == 1);
+    assert(doc.pages()[0].lines().size() == 2);
+    assert(doc.pages()[0].lines()[0] == "hi");
 
     std::cout << "document tests passed\n";
     return 0;

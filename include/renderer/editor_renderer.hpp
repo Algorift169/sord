@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "editor/editor.hpp"
+#include "renderer/page_renderer.hpp"
 
 namespace sord {
 namespace renderer {
@@ -22,6 +23,7 @@ public:
 
 private:
     std::shared_ptr<sord::editor::Editor> editor_;
+    PageRenderer page_renderer_;
 };
 
 }  // namespace renderer
