@@ -3,6 +3,28 @@ CXXFLAGS ?= -std=c++20 -O2 -Wall -Wextra
 CPPFLAGS += -Iinclude $(shell pkg-config --cflags ftxui)
 LDLIBS += $(shell pkg-config --libs ftxui)
 
+# libharu (libhpdf) detection via pkg-config, with a fallback when pkg-config is missing.
+LIBHPDF_PKG_CFLAGS := $(shell pkg-config --cflags libhpdf 2>/dev/null)
+LIBHPDF_PKG_LIBS := $(shell pkg-config --libs libhpdf 2>/dev/null)
+LIBHPDF_CFLAGS :=
+LIBHPDF_LIBS :=
+ifneq ($(strip $(LIBHPDF_PKG_CFLAGS)),)
+LIBHPDF_CFLAGS := $(LIBHPDF_PKG_CFLAGS)
+LIBHPDF_LIBS := $(LIBHPDF_PKG_LIBS)
+else
+ifneq ($(wildcard /usr/include/hpdf.h)$(wildcard /usr/local/include/hpdf.h)),)
+LIBHPDF_CFLAGS := -I/usr/include
+LIBHPDF_LIBS := -lhpdf
+endif
+endif
+ifneq ($(strip $(LIBHPDF_CFLAGS))$(strip $(LIBHPDF_LIBS)),)
+CPPFLAGS += $(LIBHPDF_CFLAGS)
+LDLIBS += $(LIBHPDF_LIBS)
+HAVE_LIBHPDF := 1
+else
+HAVE_LIBHPDF := 0
+endif
+
 ROOT := $(CURDIR)
 BUILD_DIR := $(ROOT)/build
 OBJ_DIR := $(BUILD_DIR)/obj
@@ -24,6 +46,14 @@ SORD_OBJS := \
 	$(OBJ_DIR)/renderer/editor_renderer.o \
 	$(OBJ_DIR)/app/application.o \
 	$(OBJ_DIR)/app/save_manager.o
+
+ifeq ($(HAVE_LIBHPDF),1)
+SORD_OBJS += \
+	$(OBJ_DIR)/exporter/pdf_exporter.o
+else
+SORD_OBJS += \
+	$(OBJ_DIR)/exporter/pdf_exporter_stub.o
+endif
 
 TEST_OBJS := \
 	$(OBJ_DIR)/tests/document_test.o \
@@ -75,6 +105,14 @@ $(OBJ_DIR)/app/application.o: $(SRC_DIR)/app/application.cpp $(INCLUDE_DIR)/app/
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/app/save_manager.o: $(SRC_DIR)/app/save_manager.cpp $(INCLUDE_DIR)/app/save_manager.hpp | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/exporter/pdf_exporter.o: $(SRC_DIR)/exporter/pdf_exporter.cpp $(INCLUDE_DIR)/exporter/pdf_exporter.hpp | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/exporter/pdf_exporter_stub.o: $(SRC_DIR)/exporter/pdf_exporter_stub.cpp $(INCLUDE_DIR)/exporter/pdf_exporter.hpp | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 

@@ -7,6 +7,7 @@
 #include <ftxui/component/component.hpp>
 #include <ftxui/component/screen_interactive.hpp>
 #include <ftxui/dom/elements.hpp>
+#include "exporter/pdf_exporter.hpp"
 
 namespace sord {
 namespace app {
@@ -26,6 +27,16 @@ void Application::open_save_as_dialog() {
     show_save_as_dialog_ = true;
     save_as_path_ = current_path_.string();
     save_as_tab_ = 0;
+}
+
+void Application::open_export_dialog() {
+    show_export_dialog_ = true;
+    export_path_ = current_path_.replace_extension(".pdf").string();
+    export_error_message_.clear();
+}
+
+void Application::close_export_dialog() {
+    show_export_dialog_ = false;
 }
 
 void Application::close_save_as_dialog() {
@@ -117,6 +128,11 @@ int Application::run() {
         screen.PostEvent(Event::Custom);
     }, title_btn_option);
 
+    auto btn_export = Button("Export PDF", [&] {
+        open_export_dialog();
+        screen.PostEvent(Event::Custom);
+    }, title_btn_option);
+
     auto btn_new_page = Button("+", [&] {
         editor_->document().add_page();
         screen.PostEvent(Event::Custom);
@@ -126,6 +142,7 @@ int Application::run() {
         btn_save,
         btn_save_as,
         btn_new_page,
+        btn_export,
     });
 
     auto title_bar = Renderer(title_bar_container, [&] {
@@ -136,7 +153,10 @@ int Application::run() {
             text(" "),
             btn_save_as->Render(),
             text(" "),
+            text(" "),
             btn_new_page->Render(),
+            text(" "),
+            btn_export->Render(),
             filler(),
             text(current_filename()),
             text(" "),
@@ -290,8 +310,67 @@ int Application::run() {
 
     auto save_as_overlay_maybe = Maybe(save_as_overlay, &show_save_as_dialog_);
 
+    auto export_input = Input(&export_path_, "Enter path...", InputOption::Default());
+    auto export_btn_ok = Button("Export", [&] {
+        export_error_message_.clear();
+        try {
+            std::filesystem::path filepath = SaveManager::normalize_path(export_path_);
+            if (filepath.extension().empty()) {
+                filepath = filepath;
+                filepath += ".pdf";
+            }
+
+            if (!filepath.has_parent_path() || !std::filesystem::exists(filepath.parent_path())) {
+                export_error_message_ = "Directory does not exist.";
+            } else {
+                std::string error;
+                sord::exporter::PDFExporter exporter;
+                if (exporter.Export(editor_->document(), filepath, error)) {
+                    close_export_dialog();
+                } else {
+                    export_error_message_ = error.empty() ? "Export failed." : error;
+                }
+            }
+        } catch (...) {
+            export_error_message_ = "Invalid path format.";
+        }
+        screen.PostEvent(Event::Custom);
+    });
+    auto export_btn_cancel = Button("Cancel", [&] {
+        close_export_dialog();
+        screen.PostEvent(Event::Custom);
+    });
+
+    Component export_inner = Container::Vertical({
+        export_input,
+        Container::Horizontal({
+            export_btn_ok,
+            export_btn_cancel,
+        }),
+    });
+
+    auto export_overlay = Renderer(export_inner, [&]() -> Element {
+        std::vector<Element> items = {
+            text("Path:"),
+            export_input->Render(),
+            text(""),
+        };
+        if (!export_error_message_.empty()) {
+            items.push_back(text(export_error_message_) | color(Color::Red));
+            items.push_back(text(""));
+        }
+        items.push_back(hbox({
+            export_btn_ok->Render(),
+            text(" "),
+            export_btn_cancel->Render(),
+        }));
+        return window(text("Export PDF"), vbox(items)) | center;
+    });
+
+    auto export_overlay_maybe = Maybe(export_overlay, &show_export_dialog_);
+
     auto main_container = Container::Vertical(std::vector<Component>{title_bar, toolbar, editor_area, status_bar});
-    auto root = Container::Stacked(std::vector<Component>{main_container, save_overlay_maybe, save_as_overlay_maybe});
+    auto root = Container::Stacked(std::vector<Component>{main_container, save_overlay_maybe, save_as_overlay_maybe, export_overlay_maybe});
 
     auto component = CatchEvent(root, [&](Event event) {
         if (show_save_dialog_) {
@@ -306,6 +385,15 @@ int Application::run() {
         if (show_save_as_dialog_) {
             if (event == Event::Escape) {
                 close_save_as_dialog();
+                screen.PostEvent(Event::Custom);
+                return true;
+            }
+            return false;
+        }
+
+        if (show_export_dialog_) {
+            if (event == Event::Escape) {
+                close_export_dialog();
                 screen.PostEvent(Event::Custom);
                 return true;
             }
