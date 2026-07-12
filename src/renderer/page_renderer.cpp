@@ -1,6 +1,7 @@
 #include "renderer/page_renderer.hpp"
 
 #include <algorithm>
+#include <limits>
 #include <sstream>
 
 namespace sord {
@@ -18,7 +19,7 @@ std::vector<std::string> PageRenderer::render(const sord::editor::Page& page, st
 
     std::vector<std::string> visible;
     const std::size_t start_row = 0;
-    for (std::size_t i = start_row; i < std::min(lines.size(), effective_height); ++i) {
+    for (std::size_t i = start_row; i < lines.size() && i < effective_height; ++i) {
         std::string line = lines[i];
         if (line.size() > effective_width) {
             line = line.substr(0, effective_width);

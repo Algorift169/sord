@@ -147,6 +147,15 @@ void Document::set_title(std::string title) {
     title_ = std::move(title);
 }
 
+void Document::set_lines(std::vector<std::string> lines) {
+    page_manager_.pages().clear();
+    page_manager_.add_page(0);
+    page_manager_.page(0).set_lines(std::move(lines));
+    current_page_ = 0;
+    cursor_row_ = 0;
+    cursor_column_ = 0;
+}
+
 void Document::normalize_cursor() {
     auto& current_page = page_manager_.page(current_page_);
     auto& lines = current_page.lines();

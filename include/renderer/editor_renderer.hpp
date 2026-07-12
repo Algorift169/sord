@@ -19,7 +19,8 @@ public:
     [[nodiscard]] std::string render_status_bar() const;
     [[nodiscard]] std::string render_content() const;
     [[nodiscard]] std::vector<std::string> render_visible_lines(std::size_t width = 80,
-                                                               std::size_t height = 24) const;
+                                                               std::size_t height = 24,
+                                                               std::size_t offset = 0) const;
 
 private:
     std::shared_ptr<sord::editor::Editor> editor_;

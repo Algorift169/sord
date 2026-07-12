@@ -1,6 +1,7 @@
 #include "renderer/editor_renderer.hpp"
 
 #include <algorithm>
+#include <limits>
 #include <sstream>
 
 namespace sord {
@@ -50,8 +51,8 @@ std::string EditorRenderer::render_content() const {
     return oss.str();
 }
 
-std::vector<std::string> EditorRenderer::render_visible_lines(std::size_t width, std::size_t height) const {
-    std::vector<std::string> visible;
+std::vector<std::string> EditorRenderer::render_visible_lines(std::size_t width, std::size_t height, std::size_t offset) const {
+    std::vector<std::string> all_lines;
     const auto& pages = editor_->document().pages();
     const auto current_page = editor_->document().current_page();
     const auto cursor_row = editor_->document().cursor_row();
@@ -59,15 +60,24 @@ std::vector<std::string> EditorRenderer::render_visible_lines(std::size_t width,
 
     for (std::size_t page_index = 0; page_index < pages.size(); ++page_index) {
         if (page_index != 0) {
-            visible.push_back(CreatePageSeparator(width));
+            all_lines.push_back(CreatePageSeparator(width));
         }
 
-        auto page_lines = page_renderer_.render(pages[page_index], width, height,
+        auto page_lines = page_renderer_.render(pages[page_index], width, std::numeric_limits<std::size_t>::max(),
                                                page_index == current_page ? cursor_row : std::size_t(-1),
                                                cursor_col);
-        visible.insert(visible.end(), page_lines.begin(), page_lines.end());
+        all_lines.insert(all_lines.end(), page_lines.begin(), page_lines.end());
     }
 
+    if (all_lines.empty()) {
+        all_lines.emplace_back();
+    }
+
+    std::vector<std::string> visible;
+    std::size_t start = std::min(offset, all_lines.size());
+    for (std::size_t i = start; i < std::min(all_lines.size(), start + height); ++i) {
+        visible.push_back(all_lines[i]);
+    }
     if (visible.empty()) {
         visible.emplace_back();
     }

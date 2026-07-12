@@ -29,6 +29,7 @@ public:
     [[nodiscard]] const std::string& title() const;
 
     void set_title(std::string title);
+    void set_lines(std::vector<std::string> lines);
 
 private:
     void normalize_cursor();
