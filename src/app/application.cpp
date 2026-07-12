@@ -91,6 +91,15 @@ int Application::run() {
 
     std::string save_error_message_;
 
+    auto title_btn_option = ButtonOption::Animated();
+    title_btn_option.transform = [](const EntryState& s) {
+        auto element = text("[" + s.label + "]");
+        if (s.focused) {
+            element = element | inverted;
+        }
+        return element;
+    };
+
     auto btn_save = Button("Save", [&] {
         if (document_saved_) {
             save_document();
@@ -100,13 +109,13 @@ int Application::run() {
             save_error_message_ = "";
         }
         screen.PostEvent(Event::Custom);
-    });
+    }, title_btn_option);
 
     auto btn_save_as = Button("Save As", [&] {
         open_save_as_dialog();
         save_error_message_ = "";
         screen.PostEvent(Event::Custom);
-    });
+    }, title_btn_option);
 
     auto title_bar_container = Container::Horizontal({
         btn_save,
