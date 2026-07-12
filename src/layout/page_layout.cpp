@@ -23,11 +23,11 @@ std::size_t PageLayout::margin_top() const {
 }
 
 std::size_t PageLayout::content_width() const {
-    return width_ > margin_left_ ? width_ - margin_left_ : 0;
+    return width_ > margin_left_ * 2 ? width_ - margin_left_ * 2 : 0;
 }
 
 std::size_t PageLayout::content_height() const {
-    return height_ > margin_top_ ? height_ - margin_top_ : 0;
+    return height_ > margin_top_ * 2 ? height_ - margin_top_ * 2 : 0;
 }
 
 }  // namespace layout

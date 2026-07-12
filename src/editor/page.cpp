@@ -5,15 +5,9 @@
 namespace sord {
 namespace editor {
 
-Page::Page() : lines_() {
-    lines_.emplace_back();
-}
+Page::Page() : lines_() {}
 
-Page::Page(std::vector<std::string> lines) : lines_(std::move(lines)) {
-    if (lines_.empty()) {
-        lines_.emplace_back();
-    }
-}
+Page::Page(std::vector<std::string> lines) : lines_(std::move(lines)) {}
 
 std::vector<std::string>& Page::lines() {
     return lines_;

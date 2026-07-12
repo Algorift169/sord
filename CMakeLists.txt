@@ -12,8 +12,7 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(FTXUI REQUIRED IMPORTED_TARGET ftxui)
 pkg_check_modules(LIBHPDF QUIET IMPORTED_TARGET libhpdf)
 
-set(SOURCES
-    src/main.cpp
+set(CORE_SOURCES
     src/editor/page.cpp
     src/editor/page_manager.cpp
     src/editor/document.cpp
@@ -26,35 +25,48 @@ set(SOURCES
 )
 
 if(LIBHPDF_FOUND)
-    list(APPEND SOURCES src/exporter/pdf_exporter.cpp)
+    list(APPEND CORE_SOURCES src/exporter/pdf_exporter.cpp)
 else()
-    list(APPEND SOURCES src/exporter/pdf_exporter_stub.cpp)
+    list(APPEND CORE_SOURCES src/exporter/pdf_exporter_stub.cpp)
 endif()
 
-add_executable(sord ${SOURCES})
+add_library(sord_core STATIC ${CORE_SOURCES})
 
-target_include_directories(sord PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${FTXUI_INCLUDE_DIRS})
-target_link_libraries(sord PRIVATE PkgConfig::FTXUI)
+target_include_directories(sord_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include PUBLIC ${FTXUI_INCLUDE_DIRS})
+target_link_libraries(sord_core PUBLIC PkgConfig::FTXUI)
 if(LIBHPDF_FOUND)
-    target_link_libraries(sord PRIVATE PkgConfig::LIBHPDF)
-    target_include_directories(sord PRIVATE ${LIBHPDF_INCLUDE_DIRS})
-    target_compile_definitions(sord PRIVATE HAVE_LIBHPDF=1)
+    target_link_libraries(sord_core PUBLIC PkgConfig::LIBHPDF)
+    target_include_directories(sord_core PUBLIC ${LIBHPDF_INCLUDE_DIRS})
+    target_compile_definitions(sord_core PUBLIC HAVE_LIBHPDF=1)
 else()
-    target_compile_definitions(sord PRIVATE HAVE_LIBHPDF=0)
+    target_compile_definitions(sord_core PUBLIC HAVE_LIBHPDF=0)
 endif()
 
-add_executable(sord_tests
-    tests/document_test.cpp
-    src/editor/page.cpp
-    src/editor/page_manager.cpp
-    src/editor/document.cpp
-)
+add_executable(sord src/main.cpp)
+target_link_libraries(sord PRIVATE sord_core)
 
-target_include_directories(sord_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+# Helper function to add a test executable
+function(add_sord_test name source)
+    add_executable(${name} ${source})
+    target_link_libraries(${name} PRIVATE sord_core)
+    target_compile_features(${name} PRIVATE cxx_std_20)
+    add_test(NAME ${name} COMMAND ${name})
+endfunction()
 
-target_compile_features(sord_tests PRIVATE cxx_std_20)
-
-add_test(NAME document_tests COMMAND sord_tests)
+add_sord_test(test_document_title tests/test_document_title.cpp)
+add_sord_test(test_document_insert_char tests/test_document_insert_char.cpp)
+add_sord_test(test_document_insert_newline tests/test_document_insert_newline.cpp)
+add_sord_test(test_document_backspace tests/test_document_backspace.cpp)
+add_sord_test(test_document_move_cursor tests/test_document_move_cursor.cpp)
+add_sord_test(test_page_basics tests/test_page_basics.cpp)
+add_sord_test(test_page_manager_basics tests/test_page_manager_basics.cpp)
+add_sord_test(test_page_manager_add_remove tests/test_page_manager_add_remove.cpp)
+add_sord_test(test_page_manager_reorder tests/test_page_manager_reorder.cpp)
+add_sord_test(test_page_layout tests/test_page_layout.cpp)
+add_sord_test(test_save_manager_path tests/test_save_manager_path.cpp)
+add_sord_test(test_save_manager_save tests/test_save_manager_save.cpp)
+add_sord_test(test_editor_input tests/test_editor_input.cpp)
+add_sord_test(test_pdf_exporter tests/test_pdf_exporter.cpp)
 
 add_custom_target(distclean
     COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_BINARY_DIR}

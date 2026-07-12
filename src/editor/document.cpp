@@ -6,7 +6,9 @@
 namespace sord {
 namespace editor {
 
-Document::Document(std::string title) : title_(std::move(title)) {}
+Document::Document(std::string title) : title_(std::move(title)) {
+    page_manager_.page(0).set_lines({""});
+}
 
 void Document::insert_char(char ch) {
     if (ch == '\n') {

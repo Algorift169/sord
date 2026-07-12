@@ -1,75 +1,76 @@
 #!/usr/bin/env bash
 
-# deps.sh - Install Sord compiler and FTXUI library dependencies across Linux distributions
-
+# Exit immediately if any command fails
 set -e
 
-echo "=== Sord Dependency Installer ==="
+# Get the root directory of the project
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
 
-# Helper to check if a command exists
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
-}
+echo "=== Building Sord project and all unit tests ==="
+cmake -S . -B build
+cmake --build build
 
-# Detect package manager and install system compiler/build tools
-if command_exists apt-get; then
-    echo "Detected Debian/Ubuntu-based system."
-    sudo apt-get update
-    sudo apt-get install -y build-essential pkg-config cmake git
+echo ""
+echo "=== Running all tests one by one ==="
+echo ""
+
+# List of tests to run
+TESTS=(
+    "test_document_title"
+    "test_document_insert_char"
+    "test_document_insert_newline"
+    "test_document_backspace"
+    "test_document_move_cursor"
+    "test_page_basics"
+    "test_page_manager_basics"
+    "test_page_manager_add_remove"
+    "test_page_manager_reorder"
+    "test_page_layout"
+    "test_save_manager_path"
+    "test_save_manager_save"
+    "test_editor_input"
+    "test_pdf_exporter"
+)
+
+PASSED_COUNT=0
+FAILED_COUNT=0
+FAILED_TESTS=()
+
+for test_name in "${TESTS[@]}"; do
+    test_bin="./build/${test_name}"
     
-    # Try installing packaged ftxui if available
-    echo "Checking for ftxui packages..."
-    if apt-cache show libftxui-dev >/dev/null 2>&1; then
-        sudo apt-get install -y libftxui-dev
-    else
-        echo "libftxui-dev not found in package repositories. Will build from source..."
-        BUILD_FTXUI_FROM_SOURCE=true
+    if [ ! -f "$test_bin" ]; then
+        echo -e "\e[31m[ERROR] Test binary not found: ${test_bin}\e[0m"
+        FAILED_COUNT=$((FAILED_COUNT + 1))
+        FAILED_TESTS+=("$test_name")
+        continue
     fi
 
-elif command_exists dnf; then
-    echo "Detected RHEL/Fedora-based system."
-    sudo dnf groupinstall -y "Development Tools"
-    sudo dnf install -y gcc-c++ cmake pkgconfig git
-    BUILD_FTXUI_FROM_SOURCE=true
-
-elif command_exists pacman; then
-    echo "Detected Arch-based system."
-    sudo pacman -Syu --noconfirm base-devel cmake git
-    
-    # Try installing ftxui from Arch repository if available
-    if pacman -Si ftxui >/dev/null 2>&1; then
-        sudo pacman -S --noconfirm ftxui
+    echo -n "Running ${test_name}... "
+    if "$test_bin" > /dev/null 2>&1; then
+        echo -e "\e[32mPASSED\e[0m"
+        PASSED_COUNT=$((PASSED_COUNT + 1))
     else
-        BUILD_FTXUI_FROM_SOURCE=true
+        echo -e "\e[31mFAILED\e[0m"
+        FAILED_COUNT=$((FAILED_COUNT + 1))
+        FAILED_TESTS+=("$test_name")
     fi
+done
 
-elif command_exists zypper; then
-    echo "Detected openSUSE-based system."
-    sudo zypper install -y -t pattern devel_C_C++
-    sudo zypper install -y cmake pkg-config git
-    BUILD_FTXUI_FROM_SOURCE=true
+echo ""
+echo "=== Test Summary ==="
+echo "Total Tests Run: $((${PASSED_COUNT} + ${FAILED_COUNT}))"
+echo -e "Passed: \e[32m${PASSED_COUNT}\e[0m"
+echo -e "Failed: \e[31m${FAILED_COUNT}\e[0m"
 
-else
-    echo "Unsupported or unrecognized distribution. Please install C++20 build tools, cmake, pkg-config, and ftxui manually."
+if [ ${FAILED_COUNT} -gt 0 ]; then
+    echo "Failed tests:"
+    for failed in "${FAILED_TESTS[@]}"; do
+        echo "  - $failed"
+    done
     exit 1
+else
+    echo "All tests passed successfully!"
+    exit 0
 fi
-
-# Build FTXUI from source if not package-installed
-if [ "$BUILD_FTXUI_FROM_SOURCE" = true ]; then
-    echo "=== Building and Installing FTXUI from source ==="
-    TEMP_DIR=$(mktemp -d)
-    cd "$TEMP_DIR"
-    git clone https://github.com/ArthurSonzogni/FTXUI.git
-    cd FTXUI
-    mkdir build
-    cd build
-    cmake .. -DFTXUI_BUILD_EXAMPLES=OFF -DFTXUI_BUILD_TESTS=OFF
-    make
-    sudo make install
-    # Clean up
-    cd /
-    rm -rf "$TEMP_DIR"
-    echo "FTXUI successfully built and installed."
-fi
-
-echo "=== All dependencies installed successfully! ==="
