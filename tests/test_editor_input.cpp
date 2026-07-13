@@ -24,6 +24,14 @@ int main() {
     // Test arrow keys: Move up (259)
     editor.handle_input(259);
     assert(editor.document().cursor_row() == 0);
+    assert(editor.document().cursor_column() == 0);
+
+    // Move right 4 times to get to column 4
+    editor.handle_input(261);
+    editor.handle_input(261);
+    editor.handle_input(261);
+    editor.handle_input(261);
+    assert(editor.document().cursor_column() == 4);
 
     // Move left (260)
     editor.handle_input(260);

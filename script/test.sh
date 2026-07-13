@@ -31,6 +31,7 @@ TESTS=(
     "test_save_manager_save"
     "test_editor_input"
     "test_pdf_exporter"
+    "test_editor_renderer"
 )
 
 PASSED_COUNT=0

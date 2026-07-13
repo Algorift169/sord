@@ -11,6 +11,8 @@
   - **Save**: Instantly saves changes if already linked to a file. If editing a new document, it prompts for a filename and writes it to the current directory.
   - **Save As**: Prompts for an absolute path and filename, performing path safety validation to prevent directory errors.
 - **Simulated File Renaming**: Cleans up previous/untitled file buffers on disk when performing "Save As" to prevent duplicate clutter.
+- **Multi-Page Document Support**: Create multiple pages with standard A4 page sizes (80×66 lines). Each page enforces a line limit with clear status bar warnings.
+- **PDF Export**: Export documents to PDF with accurate page layout preservation using Haru PDF library.
 - **Modular Design**: Separates domain models, input coordinators, layout rendering projections, and file writes.
 
 ---
@@ -21,6 +23,8 @@
   - [architecture.md](file:///home/israfil/Desktop/sord/docs/architecture.md): High-level system structure.
   - [application_logic.md](file:///home/israfil/Desktop/sord/docs/application_logic.md): FTXUI structure and modal behaviors.
   - [editor_core.md](file:///home/israfil/Desktop/sord/docs/editor_core.md): Document buffer management and cursor actions.
+  - [page_management.md](file:///home/israfil/Desktop/sord/docs/page_management.md): A4 page standards, page limits, and multi-page document handling.
+  - [pdf_exporter.md](file:///home/israfil/Desktop/sord/docs/pdf_exporter.md): PDF export functionality and page layout preservation.
 - [src/](file:///home/israfil/Desktop/sord/src/): Source code (.cpp).
 - [include/](file:///home/israfil/Desktop/sord/include/): Headers (.hpp).
 - [tests/](file:///home/israfil/Desktop/sord/tests/): Verification test suite.

@@ -8,7 +8,8 @@ namespace sord {
 namespace renderer {
 
 EditorRenderer::EditorRenderer(std::shared_ptr<sord::editor::Editor> editor)
-    : editor_(std::move(editor)), page_renderer_(sord::layout::PageLayout(80, 24, 2, 1)) {}
+    : editor_(std::move(editor)), page_renderer_(sord::layout::PageLayout(sord::layout::PageLayout::A4_WIDTH,
+                                                                          sord::layout::PageLayout::A4_HEIGHT, 2, 1)) {}
 
 std::string EditorRenderer::render_title_bar() const {
     std::ostringstream oss;
@@ -24,9 +25,21 @@ std::string EditorRenderer::render_toolbar() const {
 
 std::string EditorRenderer::render_status_bar() const {
     std::ostringstream oss;
-    oss << "Ln " << (editor_->document().cursor_row() + 1)
-        << ", Col " << (editor_->document().cursor_column() + 1)
-        << "                             UTF-8        INSERT";
+    const auto& doc = editor_->document();
+    const auto current_page = doc.current_page();
+    const auto cursor_row = doc.cursor_row();
+    const auto page_limit = doc.page_line_limit();
+    
+    oss << "Ln " << (cursor_row + 1)
+        << ", Col " << (doc.cursor_column() + 1)
+        << "  Page " << (current_page + 1);
+    
+    // Check if current page is at capacity
+    if (cursor_row + 1 >= page_limit) {
+        oss << "  [Page Full - Please add a new page]";
+    }
+    
+    oss << "                    UTF-8        INSERT";
     return oss.str();
 }
 

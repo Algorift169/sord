@@ -7,7 +7,12 @@ namespace layout {
 
 class PageLayout {
 public:
-    PageLayout(std::size_t width = 80, std::size_t height = 24, std::size_t margin_left = 2,
+    // A4 standard terminal dimensions: 80 characters wide, 66 lines tall
+    // This represents standard A4 paper (210mm × 297mm) in terminal format
+    static constexpr std::size_t A4_WIDTH = 80;
+    static constexpr std::size_t A4_HEIGHT = 66;
+
+    PageLayout(std::size_t width = A4_WIDTH, std::size_t height = A4_HEIGHT, std::size_t margin_left = 2,
                std::size_t margin_top = 1);
 
     [[nodiscard]] std::size_t width() const;

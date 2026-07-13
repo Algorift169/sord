@@ -42,6 +42,12 @@ void Document::insert_newline() {
         cursor_column_ = current.size();
     }
 
+    // Check if adding a new line would exceed the page limit
+    if (cursor_row_ + 1 >= PAGE_LINE_LIMIT) {
+        // Don't allow new line - page is at capacity
+        return;
+    }
+
     std::string rest = current.substr(cursor_column_);
     current.erase(cursor_column_);
     lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(cursor_row_ + 1), std::move(rest));
@@ -143,6 +149,10 @@ std::size_t Document::cursor_column() const {
 
 const std::string& Document::title() const {
     return title_;
+}
+
+std::size_t Document::page_line_limit() const {
+    return PAGE_LINE_LIMIT;
 }
 
 void Document::set_title(std::string title) {

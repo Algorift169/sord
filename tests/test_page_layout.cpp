@@ -6,11 +6,11 @@ int main() {
     // Default layout
     sord::layout::PageLayout default_layout;
     assert(default_layout.width() == 80);
-    assert(default_layout.height() == 24);
+    assert(default_layout.height() == 66);
     assert(default_layout.margin_left() == 2);
     assert(default_layout.margin_top() == 1);
     assert(default_layout.content_width() == 76); // 80 - 2 * 2
-    assert(default_layout.content_height() == 22); // 24 - 1 * 2
+    assert(default_layout.content_height() == 64); // 66 - 1 * 2
 
     // Custom layout
     sord::layout::PageLayout custom_layout(100, 50, 5, 2);

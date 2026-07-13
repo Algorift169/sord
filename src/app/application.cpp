@@ -463,7 +463,29 @@ int Application::run() {
     });
 
     auto status_bar = Renderer([&] {
-        return text(renderer_->render_status_bar()) | border;
+        const auto& doc = editor_->document();
+        const auto current_page = doc.current_page();
+        const auto cursor_row = doc.cursor_row();
+        const auto page_limit = doc.page_line_limit();
+
+        std::ostringstream oss;
+        oss << "Ln " << (cursor_row + 1)
+            << ", Col " << (doc.cursor_column() + 1)
+            << "  Page " << (current_page + 1);
+
+        Element warning = text("");
+        if (cursor_row + 1 >= page_limit) {
+            warning = text("  [Page Full - Please add a new page]") | color(Color::Red);
+        }
+
+        return hbox({
+            text(oss.str()),
+            warning,
+            filler(),
+            text("UTF-8"),
+            text("        "),
+            text("INSERT")
+        }) | border;
     });
 
     auto save_input = Input(&save_filename_, "Enter filename...", InputOption::Default());

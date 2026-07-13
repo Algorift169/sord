@@ -67,6 +67,7 @@ add_sord_test(test_save_manager_path tests/test_save_manager_path.cpp)
 add_sord_test(test_save_manager_save tests/test_save_manager_save.cpp)
 add_sord_test(test_editor_input tests/test_editor_input.cpp)
 add_sord_test(test_pdf_exporter tests/test_pdf_exporter.cpp)
+add_sord_test(test_editor_renderer tests/test_editor_renderer.cpp)
 
 add_custom_target(distclean
     COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_BINARY_DIR}

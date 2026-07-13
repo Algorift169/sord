@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "page_manager.hpp"
+#include "../layout/page_layout.hpp"
 
 namespace sord {
 namespace editor {
@@ -27,6 +28,7 @@ public:
     [[nodiscard]] std::size_t cursor_row() const;
     [[nodiscard]] std::size_t cursor_column() const;
     [[nodiscard]] const std::string& title() const;
+    [[nodiscard]] std::size_t page_line_limit() const;
 
     void set_title(std::string title);
     void set_lines(std::vector<std::string> lines);
@@ -39,6 +41,7 @@ private:
     std::size_t current_page_ = 0;
     std::size_t cursor_row_ = 0;
     std::size_t cursor_column_ = 0;
+    static constexpr std::size_t PAGE_LINE_LIMIT = sord::layout::PageLayout::A4_HEIGHT;
 };
 
 }  // namespace editor
