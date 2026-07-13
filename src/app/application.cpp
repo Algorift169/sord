@@ -447,7 +447,7 @@ int Application::run() {
             text(current_filename()),
             text(" "),
             text(current_status_text()),
-        }) | border;
+        });
     });
 
     auto toolbar = Renderer([&] {

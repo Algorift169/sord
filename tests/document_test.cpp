@@ -9,7 +9,7 @@ int main() {
     doc.insert_char('i');
     doc.insert_newline();
     doc.insert_char('!');
-
+    
     assert(doc.lines().size() == 2);
     assert(doc.lines()[0] == "hi");
     assert(doc.lines()[1] == "!");

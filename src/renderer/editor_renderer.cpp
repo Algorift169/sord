@@ -20,7 +20,12 @@ std::string EditorRenderer::render_title_bar() const {
 }
 
 std::string EditorRenderer::render_toolbar() const {
-    return "Toolbar Placeholder";
+    return "Toolbar Titlebar Placeholder\n"
+           "_________________________________________________________________________________________________________\n"
+           "Sub Toolbar Placeholder\n"
+           "\n"
+           "\n"
+           "\n";
 }
 
 std::string EditorRenderer::render_status_bar() const {
