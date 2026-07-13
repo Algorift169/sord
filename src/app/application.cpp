@@ -695,10 +695,11 @@ int Application::run() {
     auto export_btn_ok = Button("Export", [&] {
         export_error_message_.clear();
         try {
-            std::filesystem::path filepath = SaveManager::normalize_path(export_path_);
+            std::filesystem::path filepath(export_path_);
             if (filepath.extension().empty()) {
-                filepath = filepath;
                 filepath += ".pdf";
+            } else {
+                filepath.replace_extension(".pdf");
             }
 
             if (!filepath.has_parent_path() || !std::filesystem::exists(filepath.parent_path())) {
