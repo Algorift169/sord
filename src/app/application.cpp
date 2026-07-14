@@ -1,6 +1,7 @@
 #include "app/application.hpp"
 #include "app/save_manager.hpp"
 #include "renderer/toolbar_renderer.hpp"
+#include "renderer/menu/home_menu_renderer.hpp"
 
 #include <chrono>
 #include <cstdlib>
@@ -497,6 +498,14 @@ int Application::run() {
     });
 
     auto toolbar = Renderer(toolbar_title_bar, [&] {
+        std::string sub;
+        if (title_bar_selected_ == sord::renderer::ToolbarRenderer::Tab::Home) {
+            sub = sord::renderer::menu::HomeMenuRenderer::Render();
+        } else {
+            sub = sord::renderer::ToolbarRenderer::RenderSubToolbar(title_bar_selected_);
+        }
+
+        // Render tab row, then a separator line, then the menu content below it
         return vbox(std::vector<Element>{
             hbox({
                 btn_toolbar_home->Render(),
@@ -513,7 +522,10 @@ int Application::run() {
                 text(" "),
                 btn_toolbar_footer->Render(),
             }),
-            text(sord::renderer::ToolbarRenderer::RenderSubToolbar(title_bar_selected_))
+            // separator (wider to span full toolbar)
+            text(std::string(260, '-')),
+            // menu options rendered below the separator
+            text(sub)
         }) | border;
     });
 

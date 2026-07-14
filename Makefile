@@ -45,6 +45,7 @@ SORD_OBJS := \
 	$(OBJ_DIR)/renderer/page_renderer.o \
 	$(OBJ_DIR)/renderer/editor_renderer.o \
 	$(OBJ_DIR)/renderer/toolbar_renderer.o \
+	$(OBJ_DIR)/renderer/menu/home_menu_renderer.o \
 	$(OBJ_DIR)/app/application.o \
 	$(OBJ_DIR)/app/save_manager.o
 
@@ -98,6 +99,11 @@ $(OBJ_DIR)/renderer/page_renderer.o: $(SRC_DIR)/renderer/page_renderer.cpp $(INC
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/renderer/editor_renderer.o: $(SRC_DIR)/renderer/editor_renderer.cpp $(INCLUDE_DIR)/renderer/editor_renderer.hpp | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+
+
+$(OBJ_DIR)/renderer/menu/home_menu_renderer.o: $(SRC_DIR)/renderer/menu/home_menu_renderer.cpp $(INCLUDE_DIR)/renderer/menu/home_menu_renderer.hpp | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
