@@ -2,6 +2,7 @@
 #include "app/save_manager.hpp"
 #include "renderer/toolbar_renderer.hpp"
 #include "renderer/menu/home_menu_renderer.hpp"
+#include "renderer/menu/insert_menu_renderer.hpp"
 
 #include <chrono>
 #include <cstdlib>
@@ -501,6 +502,8 @@ int Application::run() {
         std::string sub;
         if (title_bar_selected_ == sord::renderer::ToolbarRenderer::Tab::Home) {
             sub = sord::renderer::menu::HomeMenuRenderer::Render();
+        } else if (title_bar_selected_ == sord::renderer::ToolbarRenderer::Tab::Insert) {
+            sub = sord::renderer::menu::insertMenuRenderer::Render();
         } else {
             sub = sord::renderer::ToolbarRenderer::RenderSubToolbar(title_bar_selected_);
         }
