@@ -8,7 +8,8 @@ namespace menu {
         std::ostringstream oss;
 
         // First row: font selector, size, small controls (approximate layout)
-        oss << "[Image] [Table] [Icons] [Symbol] [Equation] [Shapes] [Table]  [Take screenshot] [Page Number] [Comment]" << "\n";
+        oss << "[Image] [Table] [Icons] [Symbol] [Equation] [Shapes] [Table]  [Take screenshot] [Page Number] [Comment] [header] [footer]" << "\n";
+        
         oss << "\n\n\n\n";
 
         //oss << "[Table]  [Take screenshot] [Page Number] [Comment]\n";

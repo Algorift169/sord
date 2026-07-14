@@ -10,11 +10,11 @@ std::string HomeMenuRenderer::Render() {
     std::ostringstream oss;
 
     // First row: font selector, size, small controls (approximate layout)
-    oss << "[Fronts] [F.Size] [t++] [t--] [Text Color] [Highlight] [Clear]" << "\n";
+    oss << "[Fronts] [F.Size] [t++] [t--] [Text Color] [Highlight] [Clear] [Align] [Paging] [Search....]" << "\n";
     oss << "\n";
 
     // Second row: big style buttons (B I U etc) and paragraph group placeholders
-    oss <<"                              ";
+    oss <<"                    [Mergine] " ;
     oss << "[B]   [I]   [U]   [S]   [X]2   [X^2]        \t     [Left] [Center] [Right] [Justify]" << "\n";
     oss <<"                              ";   
     oss << "             Font                                             Paragraph\n";

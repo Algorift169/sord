@@ -437,23 +437,8 @@ int Application::run() {
         screen.PostEvent(Event::Custom);
     }, title_btn_option);
 
-    auto btn_toolbar_paging = Button("Paging", [&] {
-        title_bar_selected_ = renderer::ToolbarRenderer::Tab::Paging;
-        screen.PostEvent(Event::Custom);
-    }, title_btn_option);
-
     auto btn_toolbar_graph_charts = Button("Graph/Charts", [&] {
         title_bar_selected_ = renderer::ToolbarRenderer::Tab::GraphCharts;
-        screen.PostEvent(Event::Custom);
-    }, title_btn_option);
-
-    auto btn_toolbar_header = Button("Header", [&] {
-        title_bar_selected_ = renderer::ToolbarRenderer::Tab::Header;
-        screen.PostEvent(Event::Custom);
-    }, title_btn_option);
-
-    auto btn_toolbar_footer = Button("Footer", [&] {
-        title_bar_selected_ = renderer::ToolbarRenderer::Tab::Footer;
         screen.PostEvent(Event::Custom);
     }, title_btn_option);
 
@@ -492,10 +477,7 @@ int Application::run() {
         btn_toolbar_home,
         btn_toolbar_insert,
         btn_toolbar_draw,
-        btn_toolbar_paging,
         btn_toolbar_graph_charts,
-        btn_toolbar_header,
-        btn_toolbar_footer,
     });
 
     auto toolbar = Renderer(toolbar_title_bar, [&] {
@@ -517,13 +499,7 @@ int Application::run() {
                 text(" "),
                 btn_toolbar_draw->Render(),
                 text(" "),
-                btn_toolbar_paging->Render(),
-                text(" "),
                 btn_toolbar_graph_charts->Render(),
-                text(" "),
-                btn_toolbar_header->Render(),
-                text(" "),
-                btn_toolbar_footer->Render(),
             }),
             // separator (wider to span full toolbar)
             text(std::string(260, '-')),

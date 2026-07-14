@@ -10,10 +10,10 @@ std::vector<std::string> ToolbarRenderer::Titles() {
         "Home",
         "Insert",
         "Draw",
-        "Paging",
+        //"Paging",
         "Graph/Charts",
-        "Header",
-        "Footer",
+        //"Header",
+        //"Footer",
     };
 }
 
@@ -25,14 +25,14 @@ std::string ToolbarRenderer::TabLabel(Tab tab) {
             return "Insert ";
         case Tab::Draw:
             return "Draw ";
-        case Tab::Paging:
-            return "Paging ";
+        //case Tab::Paging:
+            //return "Paging ";
         case Tab::GraphCharts:
             return "Graph/Charts ";
-        case Tab::Header:
-            return "Header ";
-        case Tab::Footer:
-            return "Footer ";
+        //case Tab::Header:
+            //return "Header ";
+        //case Tab::Footer:
+            //return "Footer ";
     }
     return "Unknown";
 }
