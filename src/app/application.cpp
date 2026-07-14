@@ -1,5 +1,6 @@
 #include "app/application.hpp"
 #include "app/save_manager.hpp"
+#include "renderer/toolbar_renderer.hpp"
 
 #include <chrono>
 #include <cstdlib>
@@ -419,6 +420,41 @@ int Application::run() {
         screen.PostEvent(Event::Custom);
     }, title_btn_option);
 
+    auto btn_toolbar_home = Button("Home", [&] {
+        title_bar_selected_ = renderer::ToolbarRenderer::Tab::Home;
+        screen.PostEvent(Event::Custom);
+    }, title_btn_option);
+
+    auto btn_toolbar_insert = Button("Insert", [&] {
+        title_bar_selected_ = renderer::ToolbarRenderer::Tab::Insert;
+        screen.PostEvent(Event::Custom);
+    }, title_btn_option);
+
+    auto btn_toolbar_draw = Button("Draw", [&] {
+        title_bar_selected_ = renderer::ToolbarRenderer::Tab::Draw;
+        screen.PostEvent(Event::Custom);
+    }, title_btn_option);
+
+    auto btn_toolbar_paging = Button("Paging", [&] {
+        title_bar_selected_ = renderer::ToolbarRenderer::Tab::Paging;
+        screen.PostEvent(Event::Custom);
+    }, title_btn_option);
+
+    auto btn_toolbar_graph_charts = Button("Graph/Charts", [&] {
+        title_bar_selected_ = renderer::ToolbarRenderer::Tab::GraphCharts;
+        screen.PostEvent(Event::Custom);
+    }, title_btn_option);
+
+    auto btn_toolbar_header = Button("Header", [&] {
+        title_bar_selected_ = renderer::ToolbarRenderer::Tab::Header;
+        screen.PostEvent(Event::Custom);
+    }, title_btn_option);
+
+    auto btn_toolbar_footer = Button("Footer", [&] {
+        title_bar_selected_ = renderer::ToolbarRenderer::Tab::Footer;
+        screen.PostEvent(Event::Custom);
+    }, title_btn_option);
+
     auto title_bar_container = Container::Horizontal({
         btn_save,
         btn_save_as,
@@ -450,8 +486,35 @@ int Application::run() {
         });
     });
 
-    auto toolbar = Renderer([&] {
-        return text(renderer_->render_toolbar()) | border;
+    auto toolbar_title_bar = Container::Horizontal({
+        btn_toolbar_home,
+        btn_toolbar_insert,
+        btn_toolbar_draw,
+        btn_toolbar_paging,
+        btn_toolbar_graph_charts,
+        btn_toolbar_header,
+        btn_toolbar_footer,
+    });
+
+    auto toolbar = Renderer(toolbar_title_bar, [&] {
+        return vbox(std::vector<Element>{
+            hbox({
+                btn_toolbar_home->Render(),
+                text(" "),
+                btn_toolbar_insert->Render(),
+                text(" "),
+                btn_toolbar_draw->Render(),
+                text(" "),
+                btn_toolbar_paging->Render(),
+                text(" "),
+                btn_toolbar_graph_charts->Render(),
+                text(" "),
+                btn_toolbar_header->Render(),
+                text(" "),
+                btn_toolbar_footer->Render(),
+            }),
+            text(sord::renderer::ToolbarRenderer::RenderSubToolbar(title_bar_selected_))
+        }) | border;
     });
 
     auto editor_area = Renderer([&] {

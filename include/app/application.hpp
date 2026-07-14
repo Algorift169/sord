@@ -12,6 +12,7 @@
 #include <ftxui/component/screen_interactive.hpp>
 #include "../editor/editor.hpp"
 #include "../renderer/editor_renderer.hpp"
+#include "renderer/toolbar_renderer.hpp"
 
 namespace sord {
 namespace app {
@@ -72,7 +73,7 @@ private:
     bool ipc_server_running_ = false;
     ftxui::ScreenInteractive* screen_ = nullptr;
 
-    int title_bar_selected_ = 0;
+    renderer::ToolbarRenderer::Tab title_bar_selected_ = renderer::ToolbarRenderer::Tab::Home;
     int save_as_tab_ = 0;
 
     std::string save_filename_;
