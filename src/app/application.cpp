@@ -512,11 +512,7 @@ int Application::run() {
 
     auto editor_area = Renderer([&] {
         auto lines = renderer_->render_visible_lines(80, 24, editor_scroll_offset_);
-        Elements elements;
-        for (const auto& line : lines) {
-            elements.push_back(text(line));
-        }
-        return vbox(std::move(elements)) | border | flex | reflect(editor_box_);
+        return vbox(std::move(lines)) | border | flex | reflect(editor_box_);
     });
 
     auto status_bar = Renderer([&] {
@@ -808,28 +804,57 @@ int Application::run() {
 
     auto export_overlay_maybe = Maybe(export_overlay, &show_export_dialog_);
 
+    auto context_btn_option = ButtonOption::Animated();
+    context_btn_option.transform = [](const EntryState& s) {
+        return text("[" + s.label + "]");
+    };
+
     auto context_menu_btn_copy = Button("Copy", [&] {
         copy_selection_to_clipboard();
         show_context_menu_ = false;
         screen.PostEvent(Event::Custom);
-    }, title_btn_option);
+    }, context_btn_option);
 
     auto context_menu_btn_cut = Button("Cut", [&] {
         cut_selection_to_clipboard();
         show_context_menu_ = false;
         screen.PostEvent(Event::Custom);
-    }, title_btn_option);
+    }, context_btn_option);
 
     auto context_menu_btn_paste = Button("Paste", [&] {
         paste_from_clipboard();
         show_context_menu_ = false;
         screen.PostEvent(Event::Custom);
-    }, title_btn_option);
+    }, context_btn_option);
 
-    Component context_menu_inner = Container::Vertical({
+    auto context_menu_btn_select_all = Button("Select All", [&] {
+        is_selecting_ = false;
+        editor_->document().select_all();
+        show_context_menu_ = false;
+        screen.PostEvent(Event::Custom);
+    }, context_btn_option);
+
+    auto context_menu_btn_undo = Button("Undo", [&] {
+        editor_->document().undo();
+        show_context_menu_ = false;
+        mark_modified();
+        screen.PostEvent(Event::Custom);
+    }, context_btn_option);
+
+    auto context_menu_btn_redo = Button("Redo", [&] {
+        editor_->document().redo();
+        show_context_menu_ = false;
+        mark_modified();
+        screen.PostEvent(Event::Custom);
+    }, context_btn_option);
+
+    Component context_menu_inner = Container::Vertical(Components{
         context_menu_btn_copy,
         context_menu_btn_cut,
         context_menu_btn_paste,
+        context_menu_btn_select_all,
+        context_menu_btn_undo,
+        context_menu_btn_redo,
     });
 
     auto context_menu_overlay = Renderer(context_menu_inner, [&]() -> Element {
@@ -838,10 +863,13 @@ int Application::run() {
             rows.push_back(text(""));
         }
         
-        Element menu_box = window(text("Actions"), vbox({
+        Element menu_box = window(text("Actions"), vbox(Elements{
             context_menu_btn_copy->Render(),
             context_menu_btn_cut->Render(),
             context_menu_btn_paste->Render(),
+            context_menu_btn_select_all->Render(),
+            context_menu_btn_undo->Render(),
+            context_menu_btn_redo->Render(),
         }));
         
         rows.push_back(hbox({
@@ -924,6 +952,26 @@ int Application::run() {
             return false;
         }
 
+        if (event == Event::CtrlA) {
+            is_selecting_ = false;
+            editor_->document().select_all();
+            screen.PostEvent(Event::Custom);
+            return true;
+        }
+        if (event == Event::CtrlZ) {
+            editor_->document().undo();
+            mark_modified();
+            ensure_cursor_visible();
+            screen.PostEvent(Event::Custom);
+            return true;
+        }
+        if (event == Event::CtrlY) {
+            editor_->document().redo();
+            mark_modified();
+            ensure_cursor_visible();
+            screen.PostEvent(Event::Custom);
+            return true;
+        }
         if (event == Event::CtrlC) {
             copy_selection_to_clipboard();
             screen.PostEvent(Event::Custom);

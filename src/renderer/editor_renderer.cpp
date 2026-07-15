@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <limits>
 #include <sstream>
+#include <utility>
+
+using namespace ftxui;
 
 namespace sord {
 namespace renderer {
@@ -69,35 +72,86 @@ std::string EditorRenderer::render_content() const {
     return oss.str();
 }
 
-std::vector<std::string> EditorRenderer::render_visible_lines(std::size_t width, std::size_t height, std::size_t offset) const {
-    std::vector<std::string> all_lines;
+std::vector<Element> EditorRenderer::render_visible_lines(std::size_t width, std::size_t height, std::size_t offset) const {
+    std::vector<Element> all_lines;
     const auto& pages = editor_->document().pages();
     const auto current_page = editor_->document().current_page();
     const auto cursor_row = editor_->document().cursor_row();
     const auto cursor_col = editor_->document().cursor_column();
 
+    const auto& doc = editor_->document();
+    const auto selection_start = doc.selection_start();
+    const auto selection_end = doc.selection_end();
+
     for (std::size_t page_index = 0; page_index < pages.size(); ++page_index) {
         if (page_index != 0) {
-            all_lines.push_back(CreatePageSeparator(width));
+            all_lines.push_back(text(CreatePageSeparator(width)));
         }
 
         auto page_lines = page_renderer_.render(pages[page_index], width, std::numeric_limits<std::size_t>::max(),
                                                page_index == current_page ? cursor_row : std::size_t(-1),
                                                cursor_col);
-        all_lines.insert(all_lines.end(), page_lines.begin(), page_lines.end());
+        for (std::size_t row = 0; row < page_lines.size(); ++row) {
+            auto line = text(page_lines[row]);
+            if (doc.has_selection() && page_index == current_page) {
+                auto start = selection_start;
+                auto end = selection_end;
+                if (end < start) {
+                    std::swap(start, end);
+                }
+
+                if (page_index == start.page && page_index == end.page) {
+                    if (row >= start.row && row <= end.row) {
+                        if (row == start.row && row == end.row) {
+                            auto before = page_lines[row].substr(0, start.col);
+                            auto selected = page_lines[row].substr(start.col, end.col - start.col);
+                            auto after = page_lines[row].substr(end.col);
+                            line = hbox({text(before), text(selected) | inverted, text(after)});
+                        } else if (row == start.row) {
+                            auto before = page_lines[row].substr(0, start.col);
+                            auto selected = page_lines[row].substr(start.col);
+                            line = hbox({text(before), text(selected) | inverted});
+                        } else if (row == end.row) {
+                            auto selected = page_lines[row].substr(0, end.col);
+                            auto after = page_lines[row].substr(end.col);
+                            line = hbox({text(selected) | inverted, text(after)});
+                        } else {
+                            line = text(page_lines[row]) | inverted;
+                        }
+                    }
+                } else if (page_index == start.page) {
+                    if (row == start.row) {
+                        auto before = page_lines[row].substr(0, start.col);
+                        auto selected = page_lines[row].substr(start.col);
+                        line = hbox({text(before), text(selected) | inverted});
+                    }
+                } else if (page_index == end.page) {
+                    if (row == end.row) {
+                        auto selected = page_lines[row].substr(0, end.col);
+                        auto after = page_lines[row].substr(end.col);
+                        line = hbox({text(selected) | inverted, text(after)});
+                    } else if (row < end.row) {
+                        line = text(page_lines[row]) | inverted;
+                    }
+                } else if (page_index > start.page && page_index < end.page) {
+                    line = text(page_lines[row]) | inverted;
+                }
+            }
+            all_lines.push_back(line);
+        }
     }
 
     if (all_lines.empty()) {
-        all_lines.emplace_back();
+        all_lines.push_back(text(""));
     }
 
-    std::vector<std::string> visible;
+    std::vector<Element> visible;
     std::size_t start = std::min(offset, all_lines.size());
     for (std::size_t i = start; i < std::min(all_lines.size(), start + height); ++i) {
         visible.push_back(all_lines[i]);
     }
     if (visible.empty()) {
-        visible.emplace_back();
+        visible.push_back(text(""));
     }
     return visible;
 }

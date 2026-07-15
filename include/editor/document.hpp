@@ -71,11 +71,15 @@ public:
     [[nodiscard]] bool has_selection() const;
     void clear_selection();
     void delete_selection();
+    void select_all();
+    void undo();
+    void redo();
     [[nodiscard]] std::pair<Position, Position> word_selection_bounds(const Position& pos) const;
     [[nodiscard]] std::pair<Position, Position> paragraph_selection_bounds(const Position& pos) const;
 
 private:
     void normalize_cursor();
+    void snapshot_history();
 
     std::string title_;
     PageManager page_manager_;
@@ -85,6 +89,8 @@ private:
     Position selection_start_;
     Position selection_end_;
     bool has_selection_ = false;
+    std::vector<std::vector<std::string>> history_;
+    std::size_t history_index_ = 0;
     static constexpr std::size_t PAGE_LINE_LIMIT = sord::layout::PageLayout::A4_HEIGHT;
 };
 

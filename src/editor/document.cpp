@@ -9,6 +9,14 @@ namespace editor {
 
 Document::Document(std::string title) : title_(std::move(title)) {
     page_manager_.page(0).set_lines({""});
+    history_.push_back({{""}});
+    history_index_ = 0;
+}
+
+void Document::snapshot_history() {
+    history_.erase(history_.begin() + static_cast<std::ptrdiff_t>(history_index_) + 1, history_.end());
+    history_.push_back(page_manager_.page(current_page_).lines());
+    history_index_ = history_.size() - 1;
 }
 
 void Document::insert_char(char ch) {
@@ -29,6 +37,7 @@ void Document::insert_char(char ch) {
     }
     line.insert(line.begin() + static_cast<std::ptrdiff_t>(cursor_column_), ch);
     ++cursor_column_;
+    snapshot_history();
 }
 
 void Document::insert_newline() {
@@ -45,9 +54,10 @@ void Document::insert_newline() {
 
     // Check if adding a new line would exceed the page limit
     if (cursor_row_ + 1 >= PAGE_LINE_LIMIT) {
-        // Don't allow new line - page is at capacity
         return;
     }
+
+    snapshot_history();
 
     std::string rest = current.substr(cursor_column_);
     current.erase(cursor_column_);
@@ -72,12 +82,14 @@ void Document::backspace() {
         lines.erase(lines.begin() + static_cast<std::ptrdiff_t>(cursor_row_));
         --cursor_row_;
         cursor_column_ = previous.size();
+        snapshot_history();
         return;
     }
 
     auto& line = lines[cursor_row_];
     line.erase(line.begin() + static_cast<std::ptrdiff_t>(cursor_column_ - 1));
     --cursor_column_;
+    snapshot_history();
 }
 
 void Document::move_cursor(int row_delta, int col_delta) {
@@ -192,6 +204,43 @@ void Document::set_selection(const Position& start, const Position& end) {
     has_selection_ = (start != end);
 }
 
+void Document::select_all() {
+    const auto& pages = page_manager_.pages();
+    if (pages.empty()) {
+        return;
+    }
+    const auto& lines = pages[0].lines();
+    Position start{0, 0, 0};
+    Position end{0, lines.empty() ? 0 : lines.size() - 1, lines.empty() ? 0 : lines.back().size()};
+    set_selection(start, end);
+}
+
+void Document::undo() {
+    if (history_index_ == 0) {
+        return;
+    }
+    --history_index_;
+    page_manager_.pages().clear();
+    page_manager_.add_page(0);
+    page_manager_.page(0).set_lines(history_[history_index_]);
+    current_page_ = 0;
+    cursor_row_ = 0;
+    cursor_column_ = 0;
+}
+
+void Document::redo() {
+    if (history_index_ + 1 >= history_.size()) {
+        return;
+    }
+    ++history_index_;
+    page_manager_.pages().clear();
+    page_manager_.add_page(0);
+    page_manager_.page(0).set_lines(history_[history_index_]);
+    current_page_ = 0;
+    cursor_row_ = 0;
+    cursor_column_ = 0;
+}
+
 Document::Position Document::selection_start() const {
     return selection_start_;
 }
@@ -255,6 +304,7 @@ void Document::delete_selection() {
         normalize_cursor();
     }
 
+    snapshot_history();
     clear_selection();
 }
 
