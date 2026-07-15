@@ -1,6 +1,7 @@
 #include "editor/document.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <utility>
 
 namespace sord {
@@ -166,6 +167,147 @@ void Document::set_lines(std::vector<std::string> lines) {
     current_page_ = 0;
     cursor_row_ = 0;
     cursor_column_ = 0;
+}
+
+void Document::set_cursor(std::size_t page, std::size_t row, std::size_t col) {
+    current_page_ = page;
+    cursor_row_ = row;
+    cursor_column_ = col;
+    normalize_cursor();
+}
+
+void Document::insert_text(const std::string& text) {
+    for (char ch : text) {
+        if (ch == '\n') {
+            insert_newline();
+        } else {
+            insert_char(ch);
+        }
+    }
+}
+
+void Document::set_selection(const Position& start, const Position& end) {
+    selection_start_ = start;
+    selection_end_ = end;
+    has_selection_ = (start != end);
+}
+
+Document::Position Document::selection_start() const {
+    return selection_start_;
+}
+
+Document::Position Document::selection_end() const {
+    return selection_end_;
+}
+
+bool Document::has_selection() const {
+    return has_selection_;
+}
+
+void Document::clear_selection() {
+    has_selection_ = false;
+    selection_start_ = {0, 0, 0};
+    selection_end_ = {0, 0, 0};
+}
+
+void Document::delete_selection() {
+    if (!has_selection_) return;
+
+    auto start = selection_start_;
+    auto end = selection_end_;
+    if (end < start) {
+        std::swap(start, end);
+    }
+
+    const auto& pages = page_manager_.pages();
+    if (start.page >= pages.size()) return;
+
+    if (start.page == end.page) {
+        auto& page = page_manager_.page(start.page);
+        auto& lines = page.lines();
+
+        if (start.row == end.row) {
+            if (start.row < lines.size()) {
+                auto& line = lines[start.row];
+                if (end.col > line.size()) end.col = line.size();
+                line.erase(start.col, end.col - start.col);
+            }
+        } else {
+            if (start.row < lines.size()) {
+                auto& start_line = lines[start.row];
+                if (end.row < lines.size()) {
+                    start_line += lines[end.row].substr(end.col);
+                }
+            }
+
+            if (end.row < lines.size()) {
+                lines.erase(lines.begin() + static_cast<std::ptrdiff_t>(end.row));
+            }
+            if (start.row + 1 < lines.size()) {
+                lines.erase(lines.begin() + static_cast<std::ptrdiff_t>(start.row + 1),
+                            lines.begin() + static_cast<std::ptrdiff_t>(end.row));
+            }
+        }
+
+        current_page_ = start.page;
+        cursor_row_ = start.row;
+        cursor_column_ = start.col;
+        normalize_cursor();
+    }
+
+    clear_selection();
+}
+
+std::pair<Document::Position, Document::Position> Document::word_selection_bounds(const Position& pos) const {
+    const auto& pages = page_manager_.pages();
+    if (pos.page >= pages.size()) {
+        return {pos, pos};
+    }
+
+    const auto& lines = pages[pos.page].lines();
+    if (pos.row >= lines.size()) {
+        return {pos, pos};
+    }
+
+    const auto& line = lines[pos.row];
+    std::size_t col = std::min(pos.col, line.size());
+    std::size_t start = col;
+    std::size_t end = col;
+
+    while (start > 0 && !std::isspace(static_cast<unsigned char>(line[start - 1]))) {
+        --start;
+    }
+    while (end < line.size() && !std::isspace(static_cast<unsigned char>(line[end]))) {
+        ++end;
+    }
+
+    return {{pos.page, pos.row, start}, {pos.page, pos.row, end}};
+}
+
+std::pair<Document::Position, Document::Position> Document::paragraph_selection_bounds(const Position& pos) const {
+    const auto& pages = page_manager_.pages();
+    if (pos.page >= pages.size()) {
+        return {pos, pos};
+    }
+
+    const auto& lines = pages[pos.page].lines();
+    if (lines.empty()) {
+        return {pos, pos};
+    }
+
+    std::size_t start_row = pos.row;
+    while (start_row > 0 && !lines[start_row - 1].empty()) {
+        --start_row;
+    }
+
+    std::size_t end_row = pos.row;
+    while (end_row + 1 < lines.size() && !lines[end_row + 1].empty()) {
+        ++end_row;
+    }
+
+    Position start{pos.page, start_row, 0};
+    Position end{pos.page, end_row, lines[end_row].size()};
+    return {start, end};
 }
 
 void Document::normalize_cursor() {

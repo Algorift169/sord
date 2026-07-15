@@ -25,9 +25,9 @@ std::vector<std::string> PageRenderer::render(const sord::editor::Page& page, st
             line = line.substr(0, effective_width);
         }
         if (i == cursor_row && cursor_column < line.size()) {
-            line.insert(cursor_column, "█");
+            line.insert(cursor_column, "▏");
         } else if (i == cursor_row) {
-            line += "█";
+            line += "▏";
         }
         visible.push_back(line);
     }

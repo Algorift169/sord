@@ -5,6 +5,7 @@
 #include "renderer/menu/insert_menu_renderer.hpp"
 
 #include <chrono>
+#include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include <sstream>
@@ -371,6 +372,7 @@ int Application::run() {
     using namespace ftxui;
 
     auto screen = ScreenInteractive::Fullscreen();
+    screen.TrackMouse(true);
     start_ipc_server(&screen);
 
     std::string save_error_message_;
@@ -509,11 +511,12 @@ int Application::run() {
     });
 
     auto editor_area = Renderer([&] {
-        std::vector<Element> lines;
-        for (const auto& line : renderer_->render_visible_lines(80, 24, editor_scroll_offset_)) {
-            lines.push_back(text(line));
+        auto lines = renderer_->render_visible_lines(80, 24, editor_scroll_offset_);
+        Elements elements;
+        for (const auto& line : lines) {
+            elements.push_back(text(line));
         }
-        return vbox(lines) | border | flex;
+        return vbox(std::move(elements)) | border | flex | reflect(editor_box_);
     });
 
     auto status_bar = Renderer([&] {
@@ -805,11 +808,86 @@ int Application::run() {
 
     auto export_overlay_maybe = Maybe(export_overlay, &show_export_dialog_);
 
+    auto context_menu_btn_copy = Button("Copy", [&] {
+        copy_selection_to_clipboard();
+        show_context_menu_ = false;
+        screen.PostEvent(Event::Custom);
+    }, title_btn_option);
+
+    auto context_menu_btn_cut = Button("Cut", [&] {
+        cut_selection_to_clipboard();
+        show_context_menu_ = false;
+        screen.PostEvent(Event::Custom);
+    }, title_btn_option);
+
+    auto context_menu_btn_paste = Button("Paste", [&] {
+        paste_from_clipboard();
+        show_context_menu_ = false;
+        screen.PostEvent(Event::Custom);
+    }, title_btn_option);
+
+    Component context_menu_inner = Container::Vertical({
+        context_menu_btn_copy,
+        context_menu_btn_cut,
+        context_menu_btn_paste,
+    });
+
+    auto context_menu_overlay = Renderer(context_menu_inner, [&]() -> Element {
+        std::vector<Element> rows;
+        for (int i = 0; i < context_menu_y_; ++i) {
+            rows.push_back(text(""));
+        }
+        
+        Element menu_box = window(text("Actions"), vbox({
+            context_menu_btn_copy->Render(),
+            context_menu_btn_cut->Render(),
+            context_menu_btn_paste->Render(),
+        }));
+        
+        rows.push_back(hbox({
+            text(std::string(context_menu_x_, ' ')),
+            menu_box
+        }));
+        
+        return vbox(rows);
+    });
+
+    auto context_menu_overlay_maybe = Maybe(context_menu_overlay, &show_context_menu_);
+
     auto main_container = Container::Vertical(std::vector<Component>{title_bar, toolbar, editor_area, status_bar});
-    auto root = Container::Stacked(std::vector<Component>{main_container, save_overlay_maybe, save_as_overlay_maybe, open_overlay_maybe, export_overlay_maybe});
+    auto root = Container::Stacked(std::vector<Component>{
+        main_container,
+        save_overlay_maybe,
+        save_as_overlay_maybe,
+        open_overlay_maybe,
+        export_overlay_maybe,
+        context_menu_overlay_maybe
+    });
 
     auto component = CatchEvent(root, [&](Event event) {
         process_pending_open_paths();
+        
+        if (show_context_menu_) {
+            if (event == Event::Escape) {
+                show_context_menu_ = false;
+                screen.PostEvent(Event::Custom);
+                return true;
+            }
+            if (event.is_mouse()) {
+                const auto& mouse = event.mouse();
+                if (mouse.button == Mouse::Left && mouse.motion == Mouse::Pressed) {
+                    int menu_w = 16;
+                    int menu_h = 6;
+                    if (mouse.x < context_menu_x_ || mouse.x >= context_menu_x_ + menu_w ||
+                        mouse.y < context_menu_y_ || mouse.y >= context_menu_y_ + menu_h) {
+                        show_context_menu_ = false;
+                        screen.PostEvent(Event::Custom);
+                        return true;
+                    }
+                }
+            }
+        }
+
         if (show_save_dialog_) {
             if (event == Event::Escape) {
                 show_save_dialog_ = false;
@@ -844,6 +922,24 @@ int Application::run() {
                 return true;
             }
             return false;
+        }
+
+        if (event == Event::CtrlC) {
+            copy_selection_to_clipboard();
+            screen.PostEvent(Event::Custom);
+            return true;
+        }
+        if (event == Event::CtrlV) {
+            paste_from_clipboard();
+            mark_modified();
+            ensure_cursor_visible();
+            screen.PostEvent(Event::Custom);
+            return true;
+        }
+        if (event == Event::CtrlX) {
+            cut_selection_to_clipboard();
+            screen.PostEvent(Event::Custom);
+            return true;
         }
 
         if (event == Event::CtrlS) {
@@ -900,12 +996,88 @@ int Application::run() {
         }
         if (event.is_mouse()) {
             const auto& mouse = event.mouse();
-            if (mouse.button == Mouse::WheelUp) {
+            if (mouse.button == Mouse::Left) {
+                if (mouse.motion == Mouse::Pressed) {
+                    sord::editor::Document::Position pos;
+                    if (map_mouse_to_position(mouse.x, mouse.y, pos)) {
+                        const auto now = std::chrono::steady_clock::now();
+                        const bool same_position = (last_click_position_.page == pos.page &&
+                                                    last_click_position_.row == pos.row &&
+                                                    last_click_position_.col == pos.col);
+                        const bool within_double_click = same_position &&
+                                                         (now - last_click_time_) < std::chrono::milliseconds(400);
+
+                        if (!within_double_click) {
+                            click_count_ = 1;
+                        } else {
+                            ++click_count_;
+                            if (click_count_ > 3) {
+                                click_count_ = 3;
+                            }
+                        }
+
+                        last_click_position_ = pos;
+                        last_click_time_ = now;
+
+                        if (click_count_ == 1) {
+                            is_selecting_ = true;
+                            editor_->document().clear_selection();
+                            editor_->document().set_selection(pos, pos);
+                            editor_->document().set_cursor(pos.page, pos.row, pos.col);
+                        } else if (click_count_ == 2) {
+                            is_selecting_ = false;
+                            const auto bounds = editor_->document().word_selection_bounds(pos);
+                            editor_->document().set_selection(bounds.first, bounds.second);
+                            editor_->document().set_cursor(pos.page, pos.row, pos.col);
+                        } else {
+                            is_selecting_ = false;
+                            const auto bounds = editor_->document().paragraph_selection_bounds(pos);
+                            editor_->document().set_selection(bounds.first, bounds.second);
+                            editor_->document().set_cursor(pos.page, pos.row, pos.col);
+                        }
+
+                        ensure_cursor_visible();
+                        screen.PostEvent(Event::Custom);
+                        return true;
+                    }
+                } else if (mouse.motion == Mouse::Moved) {
+                    if (is_selecting_) {
+                        sord::editor::Document::Position pos;
+                        if (map_mouse_to_position(mouse.x, mouse.y, pos)) {
+                            auto start = editor_->document().selection_start();
+                            editor_->document().set_selection(start, pos);
+                            editor_->document().set_cursor(pos.page, pos.row, pos.col);
+                            ensure_cursor_visible();
+                            screen.PostEvent(Event::Custom);
+                            return true;
+                        }
+                    }
+                } else if (mouse.motion == Mouse::Released) {
+                    if (is_selecting_) {
+                        is_selecting_ = false;
+                        auto start = editor_->document().selection_start();
+                        auto end = editor_->document().selection_end();
+                        if (start == end) {
+                            editor_->document().clear_selection();
+                        }
+                        screen.PostEvent(Event::Custom);
+                        return true;
+                    }
+                }
+            } else if (mouse.button == Mouse::Right && mouse.motion == Mouse::Pressed) {
+                sord::editor::Document::Position pos;
+                if (map_mouse_to_position(mouse.x, mouse.y, pos)) {
+                    show_context_menu_ = true;
+                    context_menu_x_ = mouse.x;
+                    context_menu_y_ = mouse.y;
+                    screen.PostEvent(Event::Custom);
+                    return true;
+                }
+            } else if (mouse.button == Mouse::WheelUp) {
                 scroll_view(-1);
                 screen.PostEvent(Event::Custom);
                 return true;
-            }
-            if (mouse.button == Mouse::WheelDown) {
+            } else if (mouse.button == Mouse::WheelDown) {
                 scroll_view(1);
                 screen.PostEvent(Event::Custom);
                 return true;
@@ -920,6 +1092,155 @@ int Application::run() {
 
     screen.Loop(component);
     return 0;
+}
+
+bool Application::map_absolute_line_to_page_row(std::size_t absolute_line, std::size_t& page_out, std::size_t& row_out) const {
+    const auto& pages = editor_->document().pages();
+    std::size_t current_absolute = 0;
+    for (std::size_t page_idx = 0; page_idx < pages.size(); ++page_idx) {
+        if (page_idx != 0) {
+            if (current_absolute == absolute_line) {
+                return false;
+            }
+            current_absolute += 1;
+        }
+        std::size_t num_lines = pages[page_idx].lines().size();
+        if (absolute_line >= current_absolute && absolute_line < current_absolute + num_lines) {
+            page_out = page_idx;
+            row_out = absolute_line - current_absolute;
+            return true;
+        }
+        current_absolute += num_lines;
+    }
+    return false;
+}
+
+bool Application::map_mouse_to_position(int mx, int my, sord::editor::Document::Position& pos_out) {
+    int content_x_min = editor_box_.x_min + 1;
+    int content_x_max = editor_box_.x_max - 1;
+    int content_y_min = editor_box_.y_min + 1;
+    int content_y_max = editor_box_.y_max - 1;
+
+    if (mx < content_x_min || mx > content_x_max || my < content_y_min || my > content_y_max) {
+        return false;
+    }
+
+    int relative_y = my - content_y_min;
+    std::size_t absolute_line = editor_scroll_offset_ + relative_y;
+
+    std::size_t page_idx = 0;
+    std::size_t row_idx = 0;
+    if (!map_absolute_line_to_page_row(absolute_line, page_idx, row_idx)) {
+        return false;
+    }
+
+    const auto& pages = editor_->document().pages();
+    const auto& line_str = pages[page_idx].lines()[row_idx];
+
+    int relative_x = mx - content_x_min;
+    std::size_t col_idx = std::min(static_cast<std::size_t>(std::max(0, relative_x)), line_str.size());
+
+    pos_out = sord::editor::Document::Position{page_idx, row_idx, col_idx};
+    return true;
+}
+
+void Application::copy_selection_to_clipboard() {
+    auto& doc = editor_->document();
+    if (!doc.has_selection()) return;
+
+    auto start = doc.selection_start();
+    auto end = doc.selection_end();
+    if (end < start) {
+        std::swap(start, end);
+    }
+
+    std::string text_str;
+    const auto& pages = doc.pages();
+    for (std::size_t p = start.page; p <= end.page; ++p) {
+        if (p >= pages.size()) break;
+        const auto& lines = pages[p].lines();
+        std::size_t start_r = (p == start.page) ? start.row : 0;
+        std::size_t end_r = (p == end.page) ? end.row : (lines.empty() ? 0 : lines.size() - 1);
+
+        for (std::size_t r = start_r; r <= end_r; ++r) {
+            if (r >= lines.size()) break;
+            const auto& line = lines[r];
+            std::size_t start_c = (p == start.page && r == start.row) ? start.col : 0;
+            std::size_t end_c = (p == end.page && r == end.row) ? end.col : line.size();
+
+            if (start_c > line.size()) start_c = line.size();
+            if (end_c > line.size()) end_c = line.size();
+
+            if (p > start.page || r > start_r) {
+                text_str += "\n";
+            }
+            text_str += line.substr(start_c, end_c - start_c);
+        }
+    }
+
+    internal_clipboard_ = text_str;
+
+    // Try system clipboard tools using popen
+    FILE* pipe = popen("wl-copy", "w");
+    if (pipe) {
+        std::fwrite(text_str.data(), 1, text_str.size(), pipe);
+        pclose(pipe);
+    } else {
+        pipe = popen("xclip -selection clipboard", "w");
+        if (pipe) {
+            std::fwrite(text_str.data(), 1, text_str.size(), pipe);
+            pclose(pipe);
+        } else {
+            pipe = popen("xsel --clipboard --input", "w");
+            if (pipe) {
+                std::fwrite(text_str.data(), 1, text_str.size(), pipe);
+                pclose(pipe);
+            }
+        }
+    }
+}
+
+void Application::paste_from_clipboard() {
+    std::string text_str;
+    bool system_read = false;
+
+    FILE* pipe = popen("wl-paste -n 2>/dev/null", "r");
+    if (!pipe) {
+        pipe = popen("xclip -selection clipboard -o 2>/dev/null", "r");
+    }
+    if (!pipe) {
+        pipe = popen("xsel --clipboard --output 2>/dev/null", "r");
+    }
+
+    if (pipe) {
+        char buffer[256];
+        while (std::fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+            text_str += buffer;
+        }
+        pclose(pipe);
+        if (!text_str.empty()) {
+            system_read = true;
+        }
+    }
+
+    if (!system_read) {
+        text_str = internal_clipboard_;
+    }
+
+    if (!text_str.empty()) {
+        editor_->document().insert_text(text_str);
+        mark_modified();
+        ensure_cursor_visible();
+    }
+}
+
+void Application::cut_selection_to_clipboard() {
+    if (editor_->document().has_selection()) {
+        copy_selection_to_clipboard();
+        editor_->document().delete_selection();
+        mark_modified();
+        ensure_cursor_visible();
+    }
 }
 
 }  // namespace app

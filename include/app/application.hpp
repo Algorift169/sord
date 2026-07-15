@@ -10,9 +10,11 @@
 #include <vector>
 
 #include <ftxui/component/screen_interactive.hpp>
+#include <ftxui/screen/box.hpp>
 #include "../editor/editor.hpp"
 #include "../renderer/editor_renderer.hpp"
 #include "renderer/toolbar_renderer.hpp"
+#include "../layout/page_layout.hpp"
 
 namespace sord {
 namespace app {
@@ -52,6 +54,13 @@ private:
     void process_pending_open_paths();
     void start_ipc_server(ftxui::ScreenInteractive* screen);
     void stop_ipc_server();
+    
+    // Clipboard and selection methods
+    void copy_selection_to_clipboard();
+    void paste_from_clipboard();
+    void cut_selection_to_clipboard();
+    bool map_mouse_to_position(int mx, int my, sord::editor::Document::Position& pos_out);
+    bool map_absolute_line_to_page_row(std::size_t absolute_line, std::size_t& page_out, std::size_t& row_out) const;
 
     std::shared_ptr<sord::editor::Editor> editor_;
     std::shared_ptr<sord::renderer::EditorRenderer> renderer_;
@@ -83,6 +92,17 @@ private:
     std::string export_error_message_;
     std::string open_error_message_;
     std::optional<std::chrono::steady_clock::time_point> saved_status_expires_;
+    
+    // Selection and clipboard members
+    bool show_context_menu_ = false;
+    int context_menu_x_ = 0;
+    int context_menu_y_ = 0;
+    bool is_selecting_ = false;
+    std::string internal_clipboard_;
+    ftxui::Box editor_box_;
+    std::chrono::steady_clock::time_point last_click_time_;
+    sord::editor::Document::Position last_click_position_;
+    int click_count_ = 0;
 };
 
 }  // namespace app
