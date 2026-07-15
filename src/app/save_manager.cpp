@@ -11,8 +11,6 @@ std::filesystem::path SaveManager::normalize_path(std::string path) {
         auto filename = result.filename().string();
         if (filename.find('.') == std::string::npos) {
             result += ".sord";
-        } else if (result.extension() != ".sord") {
-            result.replace_extension(".sord");
         }
     }
     return result;
