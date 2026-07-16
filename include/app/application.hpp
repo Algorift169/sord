@@ -107,6 +107,12 @@ private:
     // Font family dropdown members
     bool show_font_dropdown_ = false;
     int font_dropdown_scroll_ = 0;
+    int font_dropdown_focus_ = 0;
+
+    [[nodiscard]] int font_dropdown_top_row() const;
+    [[nodiscard]] int font_dropdown_left_col() const;
+    [[nodiscard]] int font_dropdown_visible_count() const;
+    [[nodiscard]] int font_dropdown_max_scroll() const;
 };
 
 }  // namespace app
