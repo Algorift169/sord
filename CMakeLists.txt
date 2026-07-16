@@ -20,6 +20,9 @@ set(CORE_SOURCES
     src/layout/page_layout.cpp
     src/renderer/page_renderer.cpp
     src/renderer/editor_renderer.cpp
+    src/renderer/toolbar_renderer.cpp
+    src/renderer/menu/home_menu_renderer.cpp
+    src/renderer/menu/insert_menu_renderer.cpp
     src/app/application.cpp
     src/app/save_manager.cpp
 )

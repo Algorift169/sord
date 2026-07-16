@@ -5,7 +5,7 @@
 int main() {
     sord::editor::PageManager pm;
     assert(pm.size() == 1);
-    assert(pm.page(0).lines().empty());
+    assert(pm.page(0).lines().size() == 1 && pm.page(0).lines()[0].empty());
 
     sord::editor::PageManager pm2(5);
     assert(pm2.size() == 5);

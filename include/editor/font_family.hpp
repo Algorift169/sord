@@ -23,6 +23,7 @@ public:
         "Century Gothic",
         "Comic Sans MS",
         "Consolas",
+        "Courier",
         "Constantia",
         "Corbel",
         "Courier New",

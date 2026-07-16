@@ -63,6 +63,11 @@ public:
 
     void set_title(std::string title);
     void set_lines(std::vector<std::string> lines);
+    // Load rich document content from serialized run data (preserves per-run font_family).
+    // Each outer vector is a page; each middle vector is a paragraph/line;
+    // each inner vector contains the styled runs of that paragraph.
+    void set_pages_from_runs(
+        std::vector<std::vector<std::vector<TextRun>>> pages_runs);
     void set_cursor(std::size_t page, std::size_t row, std::size_t col);
     
     // Selection methods
@@ -94,7 +99,10 @@ private:
     Position selection_start_;
     Position selection_end_;
     bool has_selection_ = false;
-    std::vector<std::vector<std::string>> history_;
+    using PageRuns = std::vector<std::vector<TextRun>>;
+    using HistoryEntry = std::vector<PageRuns>;
+
+    std::vector<HistoryEntry> history_;
     std::size_t history_index_ = 0;
     std::string current_font_family_ = FontFamily::default_font();
     static constexpr std::size_t PAGE_LINE_LIMIT = sord::layout::PageLayout::A4_HEIGHT;

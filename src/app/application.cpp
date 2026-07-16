@@ -207,35 +207,12 @@ void Application::close_export_dialog() {
 }
 
 bool Application::load_document(const std::filesystem::path& path, std::string& error) {
-    std::ifstream in(path, std::ios::binary);
-    if (!in.is_open()) {
-        error = "Unable to open file.";
+    std::string load_error;
+    if (!SaveManager::load(editor_->document(), path, load_error)) {
+        error = load_error;
         return false;
     }
-
-    std::string contents((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    std::vector<std::string> lines;
-    std::string current_line;
-    for (char ch : contents) {
-        if (ch == '\n') {
-            lines.push_back(current_line);
-            current_line.clear();
-        } else if (ch == '\r') {
-            continue;
-        } else {
-            current_line.push_back(ch);
-        }
-    }
-    if (!current_line.empty() || contents.empty()) {
-        lines.push_back(current_line);
-    }
-
-    if (lines.empty()) {
-        lines.emplace_back();
-    }
-
     editor_->document().set_title(path.filename().string());
-    editor_->document().set_lines(std::move(lines));
     current_path_ = path;
     document_saved_ = true;
     document_modified_ = false;
@@ -687,24 +664,12 @@ int Application::run() {
                 if (!std::filesystem::exists(filepath)) {
                     open_error_message_ = "File does not exist.";
                 } else {
-                    std::ifstream in(filepath, std::ios::binary);
-                    if (!in.is_open()) {
-                        open_error_message_ = "Unable to open file.";
-                    } else {
-                        std::vector<std::string> lines;
-                        std::string line;
-                        while (std::getline(in, line)) {
-                            lines.push_back(line);
-                        }
-                        if (lines.empty()) {
-                            lines.emplace_back();
-                        }
-                        editor_->document().set_title(filepath.filename().string());
-                        editor_->document().set_lines(std::move(lines));
-                        current_path_ = filepath;
-                        document_saved_ = true;
-                        document_modified_ = false;
+                    std::string load_error;
+                    if (load_document(filepath, load_error)) {
+                        open_file_path_ = current_path_.string();
                         close_open_dialog();
+                    } else {
+                        open_error_message_ = load_error.empty() ? "Failed to open file." : load_error;
                     }
                 }
             }

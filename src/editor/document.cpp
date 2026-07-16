@@ -6,16 +6,173 @@
 
 namespace sord {
 namespace editor {
+namespace {
+
+std::size_t line_length(const std::vector<TextRun>& line_runs) {
+    std::size_t total = 0;
+    for (const auto& run : line_runs) {
+        total += run.text.size();
+    }
+    return total;
+}
+
+void ensure_line_exists(std::vector<std::vector<TextRun>>& lines, std::size_t row) {
+    if (row >= lines.size()) {
+        lines.resize(row + 1);
+    }
+}
+
+void insert_text_into_line(std::vector<TextRun>& line_runs, std::size_t cursor_column, const std::string& text,
+                           const std::string& font_family) {
+    if (text.empty()) {
+        return;
+    }
+
+    const std::size_t line_len = line_length(line_runs);
+    if (cursor_column > line_len) {
+        cursor_column = line_len;
+    }
+
+    std::size_t offset = 0;
+    for (std::size_t index = 0; index < line_runs.size(); ++index) {
+        auto& run = line_runs[index];
+        const std::size_t run_len = run.text.size();
+        if (cursor_column == offset + run_len) {
+            line_runs.insert(line_runs.begin() + static_cast<std::ptrdiff_t>(index + 1),
+                             TextRun(text, font_family));
+            return;
+        }
+        if (cursor_column < offset + run_len) {
+            if (cursor_column == offset) {
+                line_runs.insert(line_runs.begin() + static_cast<std::ptrdiff_t>(index),
+                                 TextRun(text, font_family));
+                return;
+            }
+
+            const std::size_t split_offset = cursor_column - offset;
+            auto prefix = run.text.substr(0, split_offset);
+            auto suffix = run.text.substr(split_offset);
+            run.text = std::move(prefix);
+            line_runs.insert(line_runs.begin() + static_cast<std::ptrdiff_t>(index + 1),
+                             TextRun(text, font_family));
+            line_runs.insert(line_runs.begin() + static_cast<std::ptrdiff_t>(index + 2),
+                             TextRun(std::move(suffix), run.style));
+            return;
+        }
+        offset += run_len;
+    }
+
+    line_runs.emplace_back(text, font_family);
+}
+
+void erase_text_from_line(std::vector<TextRun>& line_runs, std::size_t cursor_column) {
+    if (line_runs.empty() || cursor_column == 0) {
+        return;
+    }
+
+    const std::size_t line_len = line_length(line_runs);
+    if (cursor_column > line_len) {
+        cursor_column = line_len;
+    }
+    if (cursor_column == 0) {
+        return;
+    }
+
+    std::size_t offset = 0;
+    for (std::size_t index = 0; index < line_runs.size(); ++index) {
+        auto& run = line_runs[index];
+        const std::size_t run_len = run.text.size();
+        if (cursor_column <= offset + run_len) {
+            if (cursor_column == offset) {
+                if (index > 0) {
+                    line_runs.erase(line_runs.begin() + static_cast<std::ptrdiff_t>(index - 1));
+                }
+                return;
+            }
+            if (cursor_column == offset + run_len) {
+                run.text.erase();
+                if (run.text.empty()) {
+                    line_runs.erase(line_runs.begin() + static_cast<std::ptrdiff_t>(index));
+                }
+                return;
+            }
+            const std::size_t split_offset = cursor_column - offset;
+            auto prefix = run.text.substr(0, split_offset - 1);
+            auto suffix = run.text.substr(split_offset);
+            run.text = std::move(prefix);
+            line_runs.insert(line_runs.begin() + static_cast<std::ptrdiff_t>(index + 1),
+                             TextRun(std::move(suffix), run.style));
+            return;
+        }
+        offset += run_len;
+    }
+}
+
+std::vector<TextRun> split_line_at_cursor(std::vector<TextRun>& line_runs, std::size_t cursor_column) {
+    std::vector<TextRun> remainder;
+    if (line_runs.empty()) {
+        return remainder;
+    }
+
+    const std::size_t line_len = line_length(line_runs);
+    if (cursor_column >= line_len) {
+        return remainder;
+    }
+
+    std::size_t offset = 0;
+    for (std::size_t index = 0; index < line_runs.size(); ++index) {
+        auto& run = line_runs[index];
+        const std::size_t run_len = run.text.size();
+        if (cursor_column == offset + run_len) {
+            if (index + 1 < line_runs.size()) {
+                remainder.assign(line_runs.begin() + static_cast<std::ptrdiff_t>(index + 1), line_runs.end());
+                line_runs.erase(line_runs.begin() + static_cast<std::ptrdiff_t>(index + 1), line_runs.end());
+            }
+            return remainder;
+        }
+        if (cursor_column < offset + run_len) {
+            const std::size_t split_offset = cursor_column - offset;
+            auto suffix = run.text.substr(split_offset);
+            auto prefix = run.text.substr(0, split_offset);
+            run.text = std::move(prefix);
+            if (suffix.empty()) {
+                if (index + 1 < line_runs.size()) {
+                    remainder.assign(line_runs.begin() + static_cast<std::ptrdiff_t>(index + 1), line_runs.end());
+                    line_runs.erase(line_runs.begin() + static_cast<std::ptrdiff_t>(index + 1), line_runs.end());
+                }
+            } else {
+                remainder.emplace_back(std::move(suffix), run.style);
+                if (index + 1 < line_runs.size()) {
+                    remainder.insert(remainder.end(), line_runs.begin() + static_cast<std::ptrdiff_t>(index + 1),
+                                     line_runs.end());
+                }
+                line_runs.erase(line_runs.begin() + static_cast<std::ptrdiff_t>(index + 1), line_runs.end());
+            }
+            return remainder;
+        }
+        offset += run_len;
+    }
+
+    return remainder;
+}
+
+} // namespace
 
 Document::Document(std::string title) : title_(std::move(title)) {
     page_manager_.page(0).set_lines({""});
-    history_.push_back({{""}});
+    history_.push_back(HistoryEntry{PageRuns{{}}});
     history_index_ = 0;
 }
 
 void Document::snapshot_history() {
     history_.erase(history_.begin() + static_cast<std::ptrdiff_t>(history_index_) + 1, history_.end());
-    history_.push_back(page_manager_.page(current_page_).lines());
+
+    HistoryEntry snapshot;
+    for (const auto& page : page_manager_.pages()) {
+        snapshot.push_back(page.runs());
+    }
+
+    history_.push_back(std::move(snapshot));
     history_index_ = history_.size() - 1;
 }
 
@@ -26,49 +183,42 @@ void Document::insert_char(char ch) {
     }
 
     auto& current_page = page_manager_.page(current_page_);
-    auto& lines = current_page.lines();
-    if (cursor_row_ >= lines.size()) {
-        lines.emplace_back();
-    }
+    auto& paragraph_lines = current_page.runs();
+    ensure_line_exists(paragraph_lines, cursor_row_);
 
-    auto& line = lines[cursor_row_];
-    if (cursor_column_ > line.size()) {
-        cursor_column_ = line.size();
-    }
-    line.insert(line.begin() + static_cast<std::ptrdiff_t>(cursor_column_), ch);
+    auto& line_runs = paragraph_lines[cursor_row_];
+    const std::string text(1, ch);
+    insert_text_into_line(line_runs, cursor_column_, text, current_font_family_);
     ++cursor_column_;
     snapshot_history();
 }
 
 void Document::insert_newline() {
     auto& current_page = page_manager_.page(current_page_);
-    auto& lines = current_page.lines();
-    if (cursor_row_ >= lines.size()) {
-        lines.emplace_back();
+    auto& paragraph_lines = current_page.runs();
+    ensure_line_exists(paragraph_lines, cursor_row_);
+
+    auto& current_line = paragraph_lines[cursor_row_];
+    const std::size_t line_len = line_length(current_line);
+    if (cursor_column_ > line_len) {
+        cursor_column_ = line_len;
     }
 
-    auto& current = lines[cursor_row_];
-    if (cursor_column_ > current.size()) {
-        cursor_column_ = current.size();
-    }
-
-    // Check if adding a new line would exceed the page limit
     if (cursor_row_ + 1 >= PAGE_LINE_LIMIT) {
         return;
     }
 
     snapshot_history();
 
-    std::string rest = current.substr(cursor_column_);
-    current.erase(cursor_column_);
-    lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(cursor_row_ + 1), std::move(rest));
+    std::vector<TextRun> remainder = split_line_at_cursor(current_line, cursor_column_);
+    paragraph_lines.insert(paragraph_lines.begin() + static_cast<std::ptrdiff_t>(cursor_row_ + 1), std::move(remainder));
     cursor_row_ += 1;
     cursor_column_ = 0;
 }
 
 void Document::backspace() {
     auto& current_page = page_manager_.page(current_page_);
-    auto& lines = current_page.lines();
+    auto& paragraph_lines = current_page.runs();
     if (cursor_row_ == 0 && cursor_column_ == 0) {
         return;
     }
@@ -77,18 +227,26 @@ void Document::backspace() {
         if (cursor_row_ == 0) {
             return;
         }
-        auto& previous = lines[cursor_row_ - 1];
-        previous += lines[cursor_row_];
-        lines.erase(lines.begin() + static_cast<std::ptrdiff_t>(cursor_row_));
+        auto& previous = paragraph_lines[cursor_row_ - 1];
+        previous.insert(previous.end(), paragraph_lines[cursor_row_].begin(), paragraph_lines[cursor_row_].end());
+        paragraph_lines.erase(paragraph_lines.begin() + static_cast<std::ptrdiff_t>(cursor_row_));
         --cursor_row_;
-        cursor_column_ = previous.size();
+        cursor_column_ = line_length(previous);
         snapshot_history();
         return;
     }
 
-    auto& line = lines[cursor_row_];
-    line.erase(line.begin() + static_cast<std::ptrdiff_t>(cursor_column_ - 1));
+    auto& line_runs = paragraph_lines[cursor_row_];
+    const std::size_t line_len = line_length(line_runs);
+    if (cursor_column_ > line_len) {
+        cursor_column_ = line_len;
+    }
+    if (cursor_column_ == 0) {
+        return;
+    }
+
     --cursor_column_;
+    erase_text_from_line(line_runs, cursor_column_);
     snapshot_history();
 }
 
@@ -181,11 +339,35 @@ void Document::set_lines(std::vector<std::string> lines) {
     cursor_column_ = 0;
 }
 
+void Document::set_pages_from_runs(
+    std::vector<std::vector<std::vector<TextRun>>> pages_runs) {
+    page_manager_.pages().clear();
+    if (pages_runs.empty()) {
+        page_manager_.add_page(0);
+        page_manager_.page(0).set_lines({""});
+    } else {
+        for (std::size_t page_idx = 0; page_idx < pages_runs.size(); ++page_idx) {
+            page_manager_.add_page(page_idx);
+            page_manager_.page(page_idx).set_runs(std::move(pages_runs[page_idx]));
+        }
+    }
+    current_page_ = 0;
+    cursor_row_ = 0;
+    cursor_column_ = 0;
+    history_.clear();
+    HistoryEntry snapshot;
+    for (const auto& page : page_manager_.pages()) {
+        snapshot.push_back(page.runs());
+    }
+    history_.push_back(std::move(snapshot));
+    history_index_ = 0;
+}
+
 void Document::set_cursor(std::size_t page, std::size_t row, std::size_t col) {
     current_page_ = page;
     cursor_row_ = row;
     cursor_column_ = col;
-    normalize_cursor();
+    normalize_cursor(); // Ensure cursor is within valid bounds after setting
 }
 
 void Document::insert_text(const std::string& text) {
@@ -221,8 +403,15 @@ void Document::undo() {
     }
     --history_index_;
     page_manager_.pages().clear();
-    page_manager_.add_page(0);
-    page_manager_.page(0).set_lines(history_[history_index_]);
+    if (history_[history_index_].empty()) {
+        page_manager_.add_page(0);
+        page_manager_.page(0).set_runs({{}});
+    } else {
+        for (std::size_t page_idx = 0; page_idx < history_[history_index_].size(); ++page_idx) {
+            page_manager_.add_page(page_idx);
+            page_manager_.page(page_idx).set_runs(history_[history_index_][page_idx]);
+        }
+    }
     current_page_ = 0;
     cursor_row_ = 0;
     cursor_column_ = 0;
@@ -234,8 +423,15 @@ void Document::redo() {
     }
     ++history_index_;
     page_manager_.pages().clear();
-    page_manager_.add_page(0);
-    page_manager_.page(0).set_lines(history_[history_index_]);
+    if (history_[history_index_].empty()) {
+        page_manager_.add_page(0);
+        page_manager_.page(0).set_runs({{}});
+    } else {
+        for (std::size_t page_idx = 0; page_idx < history_[history_index_].size(); ++page_idx) {
+            page_manager_.add_page(page_idx);
+            page_manager_.page(page_idx).set_runs(history_[history_index_][page_idx]);
+        }
+    }
     current_page_ = 0;
     cursor_row_ = 0;
     cursor_column_ = 0;

@@ -3,6 +3,11 @@
 #include <fstream>
 #include <sstream>
 #include <iomanip>
+#include <stdexcept>
+
+#include "editor/page.hpp"
+#include "editor/text_run.hpp"
+#include "editor/font_family.hpp"
 
 namespace sord {
 namespace app {
@@ -18,21 +23,24 @@ std::filesystem::path SaveManager::normalize_path(std::string path) {
     return result;
 }
 
-// Helper function to escape JSON strings
+// ---------------------------------------------------------------------------
+// JSON helpers
+// ---------------------------------------------------------------------------
+
 static std::string escape_json_string(const std::string& str) {
     std::ostringstream oss;
     for (char c : str) {
         switch (c) {
-            case '"': oss << "\\\""; break;
+            case '"':  oss << "\\\""; break;
             case '\\': oss << "\\\\"; break;
-            case '\b': oss << "\\b"; break;
-            case '\f': oss << "\\f"; break;
-            case '\n': oss << "\\n"; break;
-            case '\r': oss << "\\r"; break;
-            case '\t': oss << "\\t"; break;
+            case '\b': oss << "\\b";  break;
+            case '\f': oss << "\\f";  break;
+            case '\n': oss << "\\n";  break;
+            case '\r': oss << "\\r";  break;
+            case '\t': oss << "\\t";  break;
             default:
                 if (static_cast<unsigned char>(c) < 0x20) {
-                    oss << "\\u" << std::hex << std::setw(4) << std::setfill('0') 
+                    oss << "\\u" << std::hex << std::setw(4) << std::setfill('0')
                         << static_cast<int>(static_cast<unsigned char>(c));
                 } else {
                     oss << c;
@@ -42,28 +50,10 @@ static std::string escape_json_string(const std::string& str) {
     return oss.str();
 }
 
-// Helper function to unescape JSON strings
-static std::string unescape_json_string(const std::string& str) {
-    std::string result;
-    for (std::size_t i = 0; i < str.length(); ++i) {
-        if (str[i] == '\\' && i + 1 < str.length()) {
-            switch (str[i + 1]) {
-                case '"': result += '"'; ++i; break;
-                case '\\': result += '\\'; ++i; break;
-                case '/': result += '/'; ++i; break;
-                case 'b': result += '\b'; ++i; break;
-                case 'f': result += '\f'; ++i; break;
-                case 'n': result += '\n'; ++i; break;
-                case 'r': result += '\r'; ++i; break;
-                case 't': result += '\t'; ++i; break;
-                default: result += str[i];
-            }
-        } else {
-            result += str[i];
-        }
-    }
-    return result;
-}
+
+// ---------------------------------------------------------------------------
+// Save
+// ---------------------------------------------------------------------------
 
 bool SaveManager::save(const editor::Document& document,
                        const std::filesystem::path& path,
@@ -74,9 +64,8 @@ bool SaveManager::save(const editor::Document& document,
         return false;
     }
 
-    // Write JSON header and document info
     out << "{\n";
-    out << "  \"version\": 1,\n";
+    out << "  \"version\": 2,\n";
     out << "  \"title\": \"" << escape_json_string(document.title()) << "\",\n";
     out << "  \"pages\": [\n";
 
@@ -84,28 +73,30 @@ bool SaveManager::save(const editor::Document& document,
     for (std::size_t page_idx = 0; page_idx < pages.size(); ++page_idx) {
         const auto& page = pages[page_idx];
         out << "    {\n";
-        out << "      \"lines\": [\n";
+        out << "      \"paragraphs\": [\n";
 
         const auto& runs = page.runs();
         for (std::size_t line_idx = 0; line_idx < runs.size(); ++line_idx) {
             const auto& line_runs = runs[line_idx];
-            out << "        [\n";
+            out << "        {\n";
+            out << "          \"runs\": [\n";
 
             for (std::size_t run_idx = 0; run_idx < line_runs.size(); ++run_idx) {
                 const auto& run = line_runs[run_idx];
-                out << "          {\n";
-                out << "            \"text\": \"" << escape_json_string(run.text) << "\",\n";
-                out << "            \"style\": {\n";
-                out << "              \"font_family\": \"" << escape_json_string(run.style.font_family) << "\"\n";
-                out << "            }\n";
-                out << "          }";
+                out << "            {\n";
+                out << "              \"text\": \"" << escape_json_string(run.text) << "\",\n";
+                out << "              \"style\": {\n";
+                out << "                \"font_family\": \"" << escape_json_string(run.style.font_family) << "\"\n";
+                out << "              }\n";
+                out << "            }";
                 if (run_idx + 1 < line_runs.size()) {
                     out << ",";
                 }
                 out << "\n";
             }
 
-            out << "        ]";
+            out << "          ]\n";
+            out << "        }";
             if (line_idx + 1 < runs.size()) {
                 out << ",";
             }
@@ -131,6 +122,307 @@ bool SaveManager::save(const editor::Document& document,
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// Minimal hand-rolled JSON parser  (no external dependencies)
+// ---------------------------------------------------------------------------
+// We only need to parse the structure we write ourselves, so a targeted
+// recursive-descent parser is far simpler than a general-purpose one.
+
+namespace {
+
+struct Parser {
+    const std::string& src;
+    std::size_t pos = 0;
+
+    // Advance past whitespace
+    void skip_ws() {
+        while (pos < src.size() && (src[pos] == ' ' || src[pos] == '\t' ||
+               src[pos] == '\n' || src[pos] == '\r')) {
+            ++pos;
+        }
+    }
+
+    // Expect a literal character, throw on mismatch
+    void expect(char c) {
+        skip_ws();
+        if (pos >= src.size() || src[pos] != c) {
+            throw std::runtime_error(
+                std::string("Expected '") + c + "' at position " + std::to_string(pos));
+        }
+        ++pos;
+    }
+
+    // Parse a JSON string and return its (unescaped) value
+    std::string parse_string() {
+        skip_ws();
+        expect('"');
+        std::string result;
+        while (pos < src.size() && src[pos] != '"') {
+            if (src[pos] == '\\' && pos + 1 < src.size()) {
+                ++pos; // consume backslash
+                switch (src[pos]) {
+                    case '"':  result += '"';  break;
+                    case '\\': result += '\\'; break;
+                    case '/':  result += '/';  break;
+                    case 'b':  result += '\b'; break;
+                    case 'f':  result += '\f'; break;
+                    case 'n':  result += '\n'; break;
+                    case 'r':  result += '\r'; break;
+                    case 't':  result += '\t'; break;
+                    case 'u': {
+                        // Basic BMP unicode: read 4 hex digits
+                        if (pos + 4 < src.size()) {
+                            std::string hex = src.substr(pos + 1, 4);
+                            pos += 4;
+                            // Convert to UTF-8 (simple ASCII range only for our use case)
+                            unsigned int code = 0;
+                            for (char h : hex) {
+                                code <<= 4;
+                                if (h >= '0' && h <= '9') code |= (h - '0');
+                                else if (h >= 'a' && h <= 'f') code |= (h - 'a' + 10);
+                                else if (h >= 'A' && h <= 'F') code |= (h - 'A' + 10);
+                            }
+                            if (code < 0x80) {
+                                result += static_cast<char>(code);
+                            } else if (code < 0x800) {
+                                result += static_cast<char>(0xC0 | (code >> 6));
+                                result += static_cast<char>(0x80 | (code & 0x3F));
+                            } else {
+                                result += static_cast<char>(0xE0 | (code >> 12));
+                                result += static_cast<char>(0x80 | ((code >> 6) & 0x3F));
+                                result += static_cast<char>(0x80 | (code & 0x3F));
+                            }
+                        }
+                        break;
+                    }
+                    default: result += src[pos]; break;
+                }
+                ++pos;
+            } else {
+                result += src[pos++];
+            }
+        }
+        expect('"');
+        return result;
+    }
+
+    // Skip over any JSON value without storing it
+    void skip_value() {
+        skip_ws();
+        if (pos >= src.size()) return;
+        char c = src[pos];
+        if (c == '"') { parse_string(); }
+        else if (c == '{') { skip_object(); }
+        else if (c == '[') { skip_array();  }
+        else {
+            // number / true / false / null
+            while (pos < src.size() && src[pos] != ',' && src[pos] != '}' && src[pos] != ']') {
+                ++pos;
+            }
+        }
+    }
+
+    void skip_object() {
+        expect('{');
+        skip_ws();
+        if (pos < src.size() && src[pos] == '}') { ++pos; return; }
+        while (pos < src.size()) {
+            parse_string(); // key
+            skip_ws();
+            expect(':');
+            skip_value();
+            skip_ws();
+            if (pos < src.size() && src[pos] == ',') { ++pos; skip_ws(); }
+            else break;
+        }
+        expect('}');
+    }
+
+    void skip_array() {
+        expect('[');
+        skip_ws();
+        if (pos < src.size() && src[pos] == ']') { ++pos; return; }
+        while (pos < src.size()) {
+            skip_value();
+            skip_ws();
+            if (pos < src.size() && src[pos] == ',') { ++pos; skip_ws(); }
+            else break;
+        }
+        expect(']');
+    }
+
+    // Parse a run object: { "text": "...", "style": { "font_family": "..." } }
+    editor::TextRun parse_run() {
+        editor::TextRun run;
+        expect('{');
+        skip_ws();
+        while (pos < src.size() && src[pos] != '}') {
+            std::string key = parse_string();
+            skip_ws();
+            expect(':');
+            skip_ws();
+            if (key == "text") {
+                run.text = parse_string();
+            } else if (key == "style") {
+                // Parse style object
+                expect('{');
+                skip_ws();
+                while (pos < src.size() && src[pos] != '}') {
+                    std::string style_key = parse_string();
+                    skip_ws();
+                    expect(':');
+                    skip_ws();
+                    if (style_key == "font_family") {
+                        run.style.font_family = parse_string();
+                    } else {
+                        skip_value();
+                    }
+                    skip_ws();
+                    if (pos < src.size() && src[pos] == ',') { ++pos; skip_ws(); }
+                    else break;
+                }
+                expect('}');
+            } else {
+                skip_value();
+            }
+            skip_ws();
+            if (pos < src.size() && src[pos] == ',') { ++pos; skip_ws(); }
+            else break;
+        }
+        expect('}');
+        // Validate font; fall back to default if unknown
+        if (!editor::FontFamily::is_valid(run.style.font_family)) {
+            run.style.font_family = editor::FontFamily::default_font();
+        }
+        return run;
+    }
+
+    // Parse a paragraph object: { "runs": [ ... ] }
+    std::vector<editor::TextRun> parse_paragraph() {
+        std::vector<editor::TextRun> line_runs;
+        expect('{');
+        skip_ws();
+        while (pos < src.size() && src[pos] != '}') {
+            std::string key = parse_string();
+            skip_ws();
+            expect(':');
+            skip_ws();
+            if (key == "runs") {
+                expect('[');
+                skip_ws();
+                while (pos < src.size() && src[pos] != ']') {
+                    line_runs.push_back(parse_run());
+                    skip_ws();
+                    if (pos < src.size() && src[pos] == ',') { ++pos; skip_ws(); }
+                    else break;
+                }
+                expect(']');
+            } else {
+                skip_value();
+            }
+            skip_ws();
+            if (pos < src.size() && src[pos] == ',') { ++pos; skip_ws(); }
+            else break;
+        }
+        expect('}');
+        return line_runs;
+    }
+
+    // Parse a page object: { "paragraphs": [ ... ] }
+    std::vector<std::vector<editor::TextRun>> parse_page() {
+        std::vector<std::vector<editor::TextRun>> page_runs;
+        expect('{');
+        skip_ws();
+        while (pos < src.size() && src[pos] != '}') {
+            std::string key = parse_string();
+            skip_ws();
+            expect(':');
+            skip_ws();
+            // Support both "paragraphs" (v2) and legacy "lines" (v1 name)
+            if (key == "paragraphs" || key == "lines") {
+                expect('[');
+                skip_ws();
+                while (pos < src.size() && src[pos] != ']') {
+                    // Each element could be a paragraph object { "runs": [...] }
+                    // or (legacy v1) an array of run objects [ {...}, ... ]
+                    if (src[pos] == '{') {
+                        page_runs.push_back(parse_paragraph());
+                    } else if (src[pos] == '[') {
+                        // legacy v1 format: array of run objects
+                        std::vector<editor::TextRun> line_runs;
+                        expect('[');
+                        skip_ws();
+                        while (pos < src.size() && src[pos] != ']') {
+                            line_runs.push_back(parse_run());
+                            skip_ws();
+                            if (pos < src.size() && src[pos] == ',') { ++pos; skip_ws(); }
+                            else break;
+                        }
+                        expect(']');
+                        page_runs.push_back(std::move(line_runs));
+                    } else {
+                        skip_value();
+                    }
+                    skip_ws();
+                    if (pos < src.size() && src[pos] == ',') { ++pos; skip_ws(); }
+                    else break;
+                }
+                expect(']');
+            } else {
+                skip_value();
+            }
+            skip_ws();
+            if (pos < src.size() && src[pos] == ',') { ++pos; skip_ws(); }
+            else break;
+        }
+        expect('}');
+        if (page_runs.empty()) {
+            page_runs.emplace_back(); // at least one (empty) paragraph
+        }
+        return page_runs;
+    }
+
+    // Top-level document parse
+    // Returns per-page, per-paragraph, per-run data
+    std::vector<std::vector<std::vector<editor::TextRun>>> parse_document() {
+        std::vector<std::vector<std::vector<editor::TextRun>>> pages;
+        expect('{');
+        skip_ws();
+        while (pos < src.size() && src[pos] != '}') {
+            std::string key = parse_string();
+            skip_ws();
+            expect(':');
+            skip_ws();
+            if (key == "pages") {
+                expect('[');
+                skip_ws();
+                while (pos < src.size() && src[pos] != ']') {
+                    pages.push_back(parse_page());
+                    skip_ws();
+                    if (pos < src.size() && src[pos] == ',') { ++pos; skip_ws(); }
+                    else break;
+                }
+                expect(']');
+            } else {
+                skip_value();
+            }
+            skip_ws();
+            if (pos < src.size() && src[pos] == ',') { ++pos; skip_ws(); }
+            else break;
+        }
+        // consume closing '}'
+        skip_ws();
+        if (pos < src.size() && src[pos] == '}') ++pos;
+        return pages;
+    }
+};
+
+} // anonymous namespace
+
+// ---------------------------------------------------------------------------
+// Load
+// ---------------------------------------------------------------------------
+
 bool SaveManager::load(editor::Document& document,
                        const std::filesystem::path& path,
                        std::string& error_message) {
@@ -140,68 +432,43 @@ bool SaveManager::load(editor::Document& document,
         return false;
     }
 
-    std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    std::string content((std::istreambuf_iterator<char>(in)),
+                         std::istreambuf_iterator<char>());
     in.close();
 
-    // Simple JSON parsing - look for pages and reconstruct document
-    // For now, we'll load it as plain text if it doesn't have JSON structure
-    if (content.find("\"version\"") != std::string::npos && content.find("\"pages\"") != std::string::npos) {
-        // It's a new JSON format - parse it
-        std::vector<std::vector<editor::TextRun>> all_pages;
-        
-        // Find the pages array
-        std::size_t pages_start = content.find("\"pages\": [");
-        if (pages_start == std::string::npos) {
-            error_message = "Invalid JSON format: no pages array found.";
+    // Determine format
+    bool is_sord_json = (content.find("\"version\"") != std::string::npos &&
+                         content.find("\"pages\"")   != std::string::npos);
+
+    if (is_sord_json) {
+        // Full JSON parse preserving per-run font information
+        try {
+            Parser parser{content, 0};
+            auto all_pages = parser.parse_document();
+
+            if (all_pages.empty()) {
+                // Produce a single empty page
+                all_pages.push_back({{}}); // one page, one paragraph, no runs
+            }
+
+            document.set_pages_from_runs(std::move(all_pages));
+            return true;
+
+        } catch (const std::exception& ex) {
+            error_message = std::string("JSON parse error: ") + ex.what();
             return false;
         }
-
-        // For simplicity in this implementation, we'll extract text and reconstruct
-        // A full JSON parser would be needed for complete fidelity
-        // For now, just load the text content
-        std::vector<std::string> lines;
-        std::istringstream iss(content);
-        std::string line;
-        bool in_text = false;
-        std::string current_text;
-
-        while (std::getline(iss, line)) {
-            // Simple extraction of text values from JSON
-            std::size_t text_pos = line.find("\"text\": \"");
-            if (text_pos != std::string::npos) {
-                std::size_t start = text_pos + 9;
-                std::size_t end = line.find("\"", start);
-                if (end != std::string::npos) {
-                    std::string text = line.substr(start, end - start);
-                    text = unescape_json_string(text);
-                    current_text += text;
-                }
-            }
-            
-            // Line ends indicated by empty bracket array end
-            if (line.find("        ]") != std::string::npos && !current_text.empty()) {
-                lines.emplace_back(std::move(current_text));
-                current_text.clear();
-            }
-        }
-
-        if (!current_text.empty()) {
-            lines.emplace_back(std::move(current_text));
-        }
-
-        if (lines.empty()) {
-            lines.emplace_back();
-        }
-
-        document.set_lines(std::move(lines));
-        return true;
     } else {
-        // Legacy plain text format
+        // Legacy plain-text format: one line per paragraph, no style info
         std::vector<std::string> lines;
         std::istringstream iss(content);
         std::string line;
         while (std::getline(iss, line)) {
-            lines.emplace_back(line);
+            // strip trailing CR if any
+            if (!line.empty() && line.back() == '\r') {
+                line.pop_back();
+            }
+            lines.emplace_back(std::move(line));
         }
         if (lines.empty()) {
             lines.emplace_back();

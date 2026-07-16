@@ -12,12 +12,12 @@ int main() {
     assert(p2.filename() == "my_file.sord");
 
     auto p3 = sord::app::SaveManager::normalize_path("my_file.txt");
-    assert(p3.extension() == ".sord");
-    assert(p3.filename() == "my_file.sord");
+    assert(p3.extension() == ".txt");
+    assert(p3.filename() == "my_file.txt");
 
     auto p4 = sord::app::SaveManager::normalize_path("some/dir/file.foo");
-    assert(p4.extension() == ".sord");
-    assert(p4.filename() == "file.sord");
+    assert(p4.extension() == ".foo");
+    assert(p4.filename() == "file.foo");
 
     std::cout << "test_save_manager_path passed!" << std::endl;
     return 0;

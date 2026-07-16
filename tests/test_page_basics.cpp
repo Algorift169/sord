@@ -4,9 +4,9 @@
 
 int main() {
     sord::editor::Page page;
-    assert(page.lines().empty());
+    assert(page.lines().size() == 1 && page.lines()[0].empty());
 
-    page.append_line("Hello");
+    page.set_lines({"Hello"});
     assert(page.lines().size() == 1);
     assert(page.lines()[0] == "Hello");
 

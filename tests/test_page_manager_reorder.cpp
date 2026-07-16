@@ -4,13 +4,13 @@
 
 int main() {
     sord::editor::PageManager pm;
-    pm.page(0).append_line("First");
+    pm.page(0).set_lines({"First"});
 
     pm.add_page();
-    pm.page(1).append_line("Second");
+    pm.page(1).set_lines({"Second"});
 
     pm.add_page();
-    pm.page(2).append_line("Third");
+    pm.page(2).set_lines({"Third"});
 
     assert(pm.size() == 3);
 
