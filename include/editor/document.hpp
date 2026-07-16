@@ -7,6 +7,7 @@
 
 #include "page_manager.hpp"
 #include "../layout/page_layout.hpp"
+#include "font_family.hpp"
 
 namespace sord {
 namespace editor {
@@ -77,6 +78,10 @@ public:
     [[nodiscard]] std::pair<Position, Position> word_selection_bounds(const Position& pos) const;
     [[nodiscard]] std::pair<Position, Position> paragraph_selection_bounds(const Position& pos) const;
 
+    // Font family methods
+    [[nodiscard]] const std::string& current_font_family() const;
+    void set_current_font_family(const std::string& font);
+
 private:
     void normalize_cursor();
     void snapshot_history();
@@ -91,6 +96,7 @@ private:
     bool has_selection_ = false;
     std::vector<std::vector<std::string>> history_;
     std::size_t history_index_ = 0;
+    std::string current_font_family_ = FontFamily::default_font();
     static constexpr std::size_t PAGE_LINE_LIMIT = sord::layout::PageLayout::A4_HEIGHT;
 };
 

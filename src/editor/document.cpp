@@ -371,5 +371,15 @@ void Document::normalize_cursor() {
     }
 }
 
+const std::string& Document::current_font_family() const {
+    return current_font_family_;
+}
+
+void Document::set_current_font_family(const std::string& font) {
+    if (FontFamily::is_valid(font)) {
+        current_font_family_ = font;
+    }
+}
+
 }  // namespace editor
 }  // namespace sord

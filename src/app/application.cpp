@@ -485,7 +485,9 @@ int Application::run() {
     auto toolbar = Renderer(toolbar_title_bar, [&] {
         std::string sub;
         if (title_bar_selected_ == sord::renderer::ToolbarRenderer::Tab::Home) {
-            sub = sord::renderer::menu::HomeMenuRenderer::Render();
+            sub = sord::renderer::menu::HomeMenuRenderer::Render(
+                editor_->document().current_font_family()
+            );
         } else if (title_bar_selected_ == sord::renderer::ToolbarRenderer::Tab::Insert) {
             sub = sord::renderer::menu::insertMenuRenderer::Render();
         } else {
@@ -882,6 +884,46 @@ int Application::run() {
 
     auto context_menu_overlay_maybe = Maybe(context_menu_overlay, &show_context_menu_);
 
+    // Font dropdown overlay - positioned over the editor area
+    auto font_dropdown_overlay = Renderer([&]() -> Element {
+        std::vector<Element> rows;
+        // Position dropdown below the toolbar/menu area (around row 6)
+        for (int i = 0; i < 6; ++i) {
+            rows.push_back(text(""));
+        }
+        
+        auto fonts = renderer::menu::HomeMenuRenderer::GetFontList();
+        const int visible_count = 15;  // Show more fonts at once
+        int start = std::max(0, font_dropdown_scroll_);
+        int end = std::min(static_cast<int>(fonts.size()), start + visible_count);
+        
+        Elements font_items;
+        
+        // Add scroll up indicator
+        if (start > 0) {
+            font_items.push_back(text("  ⬆ " + std::to_string(start) + " more above"));
+        }
+        
+        // Add font items
+        for (int i = start; i < end; ++i) {
+            std::string mark = (fonts[i] == editor_->document().current_font_family()) ? "✓ " : "  ";
+            font_items.push_back(text(mark + fonts[i]));
+        }
+        
+        // Add scroll down indicator
+        if (end < static_cast<int>(fonts.size())) {
+            int remaining = static_cast<int>(fonts.size()) - end;
+            font_items.push_back(text("  ⬇ " + std::to_string(remaining) + " more below"));
+        }
+        
+        Element dropdown_box = window(text("Fonts (↑↓ to scroll)"), vbox(std::move(font_items)));
+        rows.push_back(dropdown_box);
+        
+        return vbox(rows);
+    });
+
+    auto font_dropdown_overlay_maybe = Maybe(font_dropdown_overlay, &show_font_dropdown_);
+
     auto main_container = Container::Vertical(std::vector<Component>{title_bar, toolbar, editor_area, status_bar});
     auto root = Container::Stacked(std::vector<Component>{
         main_container,
@@ -889,7 +931,8 @@ int Application::run() {
         save_as_overlay_maybe,
         open_overlay_maybe,
         export_overlay_maybe,
-        context_menu_overlay_maybe
+        context_menu_overlay_maybe,
+        font_dropdown_overlay_maybe
     });
 
     auto component = CatchEvent(root, [&](Event event) {
@@ -909,6 +952,87 @@ int Application::run() {
                     if (mouse.x < context_menu_x_ || mouse.x >= context_menu_x_ + menu_w ||
                         mouse.y < context_menu_y_ || mouse.y >= context_menu_y_ + menu_h) {
                         show_context_menu_ = false;
+                        screen.PostEvent(Event::Custom);
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // Handle font dropdown events
+        if (show_font_dropdown_) {
+            if (event == Event::Escape) {
+                show_font_dropdown_ = false;
+                font_dropdown_scroll_ = 0;
+                screen.PostEvent(Event::Custom);
+                return true;
+            }
+            if (event == Event::ArrowUp) {
+                if (font_dropdown_scroll_ > 0) {
+                    --font_dropdown_scroll_;
+                    screen.PostEvent(Event::Custom);
+                }
+                return true;
+            }
+            if (event == Event::ArrowDown) {
+                auto fonts = renderer::menu::HomeMenuRenderer::GetFontList();
+                int max_scroll = static_cast<int>(fonts.size()) - 15;  // Match visible_count
+                if (max_scroll < 0) max_scroll = 0;
+                if (font_dropdown_scroll_ < max_scroll) {
+                    ++font_dropdown_scroll_;
+                    screen.PostEvent(Event::Custom);
+                }
+                return true;
+            }
+            if (event == Event::Return) {
+                auto fonts = renderer::menu::HomeMenuRenderer::GetFontList();
+                // Select the first visible font
+                int idx = std::max(0, font_dropdown_scroll_);
+                if (idx < static_cast<int>(fonts.size())) {
+                    editor_->document().set_current_font_family(fonts[idx]);
+                }
+                show_font_dropdown_ = false;
+                font_dropdown_scroll_ = 0;
+                screen.PostEvent(Event::Custom);
+                return true;
+            }
+            if (event.is_mouse()) {
+                const auto& mouse = event.mouse();
+                if (mouse.button == Mouse::Left && mouse.motion == Mouse::Pressed) {
+                    auto fonts = renderer::menu::HomeMenuRenderer::GetFontList();
+                    // Check if click is within dropdown area (rows 6-22 for 15 fonts + header)
+                    if (mouse.y >= 6 && mouse.y <= 22 && mouse.x >= 0 && mouse.x <= 40) {
+                        // Calculate which font was clicked
+                        int visible_row = mouse.y - 7;  // Account for header row
+                        int font_idx = font_dropdown_scroll_ + visible_row;
+                        if (font_idx >= 0 && font_idx < static_cast<int>(fonts.size())) {
+                            editor_->document().set_current_font_family(fonts[font_idx]);
+                        }
+                        show_font_dropdown_ = false;
+                        font_dropdown_scroll_ = 0;
+                        screen.PostEvent(Event::Custom);
+                        return true;
+                    } else {
+                        // Click outside dropdown - close it
+                        show_font_dropdown_ = false;
+                        font_dropdown_scroll_ = 0;
+                        screen.PostEvent(Event::Custom);
+                        return false;
+                    }
+                }
+            }
+            // Block all other input when dropdown is open
+            return true;
+        } else {
+            // Open the font dropdown when the user clicks the visible font selector label
+            if (event.is_mouse() && title_bar_selected_ == renderer::ToolbarRenderer::Tab::Home) {
+                const auto& mouse = event.mouse();
+                if (mouse.button == Mouse::Left && mouse.motion == Mouse::Pressed) {
+                    // The Home menu label appears on the first content row beneath the toolbar.
+                    // Keep the hit area slightly generous so the interaction feels natural.
+                    if (mouse.y >= 3 && mouse.y <= 5 && mouse.x >= 0 && mouse.x <= 18) {
+                        show_font_dropdown_ = true;
+                        font_dropdown_scroll_ = 0;
                         screen.PostEvent(Event::Custom);
                         return true;
                     }

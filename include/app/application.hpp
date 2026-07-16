@@ -103,6 +103,10 @@ private:
     std::chrono::steady_clock::time_point last_click_time_;
     sord::editor::Document::Position last_click_position_;
     int click_count_ = 0;
+
+    // Font family dropdown members
+    bool show_font_dropdown_ = false;
+    int font_dropdown_scroll_ = 0;
 };
 
 }  // namespace app
