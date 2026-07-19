@@ -25,8 +25,11 @@
   - [editor_core.md](file:///home/israfil/Desktop/sord/docs/editor_core.md): Document buffer management and cursor actions.
   - [page_management.md](file:///home/israfil/Desktop/sord/docs/page_management.md): A4 page standards, page limits, and multi-page document handling.
   - [pdf_exporter.md](file:///home/israfil/Desktop/sord/docs/pdf_exporter.md): PDF export functionality and page layout preservation.
-- [src/](file:///home/israfil/Desktop/sord/src/): Source code (.cpp).
-- [include/](file:///home/israfil/Desktop/sord/include/): Headers (.hpp).
+  - [pdf_export_font_pipeline.md](file:///home/israfil/Desktop/sord/docs/pdf_export_font_pipeline.md): Font-aware PDF exporter architecture and shaping pipeline.
+  - [font_dropdown_selection.md](file:///home/israfil/Desktop/sord/docs/font_dropdown_selection.md): Font dropdown navigation and focus behavior.
+  - [document_font_family_support.md](file:///home/israfil/Desktop/sord/docs/document_font_family_support.md): Document model and serialization support for per-run font families.
+  - [src/](file:///home/israfil/Desktop/sord/src/): Source code (.cpp).
+  - [include/](file:///home/israfil/Desktop/sord/include/): Headers (.hpp).
 - [tests/](file:///home/israfil/Desktop/sord/tests/): Verification test suite.
 
 ---
