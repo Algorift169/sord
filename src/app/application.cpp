@@ -743,7 +743,8 @@ int Application::run() {
                 filepath.replace_extension(".pdf");
             }
 
-            if (!filepath.has_parent_path() || !std::filesystem::exists(filepath.parent_path())) {
+            auto parent_path = filepath.parent_path();
+            if (!parent_path.empty() && !std::filesystem::exists(parent_path)) {
                 export_error_message_ = "Directory does not exist.";
             } else {
                 std::string error;

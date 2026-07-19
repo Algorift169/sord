@@ -290,8 +290,9 @@ struct Parser {
             else break;
         }
         expect('}');
-        // Validate font; fall back to default if unknown
-        if (!editor::FontFamily::is_valid(run.style.font_family)) {
+        // Preserve the stored font family for round-tripping and future fallback.
+        // Missing fonts are handled later during rendering/export, not by mutating the document.
+        if (run.style.font_family.empty()) {
             run.style.font_family = editor::FontFamily::default_font();
         }
         return run;

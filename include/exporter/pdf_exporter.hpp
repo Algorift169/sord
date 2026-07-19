@@ -27,7 +27,7 @@ private:
     bool CreatePage(std::string& error);
 
     // Write one paragraph from a set of styled text runs.
-    // Reads run.style.font_family from each run and selects the appropriate PDF font.
+    // Reads run.style.font_family from each run and renders into the PDF.
     bool WriteParagraphRuns(const std::vector<editor::TextRun>& line_runs,
                             double left, double top, double right, double bottom,
                             double& cursor_y, std::string& error);

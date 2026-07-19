@@ -2,18 +2,15 @@
 
 #include <sstream>
 #include <algorithm>
-#include "editor/font_family.hpp"
+#include "renderer/menu/font_manager.hpp"
 
 namespace sord {
 namespace renderer {
 namespace menu {
 
 std::vector<std::string> HomeMenuRenderer::GetFontList() {
-    std::vector<std::string> fonts;
-    for (const auto& font : editor::FontFamily::AVAILABLE_FONTS) {
-        fonts.emplace_back(font);
-    }
-    return fonts;
+    return std::vector<std::string>(renderer::menu::FontManager::font_families().begin(),
+                                   renderer::menu::FontManager::font_families().end());
 }
 
 std::string HomeMenuRenderer::Render(const std::string& current_font) {

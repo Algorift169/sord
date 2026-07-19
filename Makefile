@@ -1,7 +1,7 @@
 CXX ?= g++
 CXXFLAGS ?= -std=c++20 -O2 -Wall -Wextra
-CPPFLAGS += -Iinclude $(shell pkg-config --cflags ftxui)
-LDLIBS += $(shell pkg-config --libs ftxui)
+CPPFLAGS += -Iinclude $(shell pkg-config --cflags ftxui fontconfig harfbuzz freetype2)
+LDLIBS += $(shell pkg-config --libs ftxui fontconfig harfbuzz freetype2)
 
 # libharu (libhpdf) detection via pkg-config, with a fallback when pkg-config is missing.
 LIBHPDF_PKG_CFLAGS := $(shell pkg-config --cflags libhpdf 2>/dev/null)
@@ -35,6 +35,11 @@ INCLUDE_DIR := $(ROOT)/include
 SORD_BIN := $(BUILD_DIR)/sord
 TEST_BIN := $(BUILD_DIR)/sord_tests
 
+all: $(SORD_BIN)
+
+$(OBJ_DIR):
+	mkdir -p $(OBJ_DIR)
+
 SORD_OBJS := \
 	$(OBJ_DIR)/main.o \
 	$(OBJ_DIR)/editor/page.o \
@@ -46,34 +51,18 @@ SORD_OBJS := \
 	$(OBJ_DIR)/renderer/editor_renderer.o \
 	$(OBJ_DIR)/renderer/toolbar_renderer.o \
 	$(OBJ_DIR)/renderer/menu/home_menu_renderer.o \
+	$(OBJ_DIR)/renderer/menu/font_manager.o \
 	$(OBJ_DIR)/renderer/menu/insert_menu_renderer.o \
 	$(OBJ_DIR)/app/application.o \
-	$(OBJ_DIR)/app/save_manager.o
+	$(OBJ_DIR)/app/save_manager.o \
+	$(OBJ_DIR)/exporter/shaper.o
 
 ifeq ($(HAVE_LIBHPDF),1)
 SORD_OBJS += \
-	$(OBJ_DIR)/exporter/pdf_exporter.o
-else
-SORD_OBJS += \
-	$(OBJ_DIR)/exporter/pdf_exporter_stub.o
+	$(OBJ_DIR)/exporter/pdf_exporter.o \
+	$(OBJ_DIR)/exporter/font_cache.o \
+	$(OBJ_DIR)/exporter/glyph_run.o
 endif
-
-TEST_OBJS := \
-	$(OBJ_DIR)/tests/document_test.o \
-	$(OBJ_DIR)/editor/page.o \
-	$(OBJ_DIR)/editor/page_manager.o \
-	$(OBJ_DIR)/editor/document.o
-
-.PHONY: all test run clean distclean
-
-all: $(SORD_BIN)
-
-$(BUILD_DIR) $(OBJ_DIR):
-	mkdir -p $@
-
-$(OBJ_DIR)/main.o: $(SRC_DIR)/main.cpp $(INCLUDE_DIR)/app/application.hpp | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/editor/page.o: $(SRC_DIR)/editor/page.cpp $(INCLUDE_DIR)/editor/page.hpp | $(OBJ_DIR)
 	mkdir -p $(dir $@)
@@ -103,8 +92,15 @@ $(OBJ_DIR)/renderer/editor_renderer.o: $(SRC_DIR)/renderer/editor_renderer.cpp $
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
+$(OBJ_DIR)/main.o: $(SRC_DIR)/main.cpp $(INCLUDE_DIR)/app/application.hpp | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/renderer/menu/home_menu_renderer.o: $(SRC_DIR)/renderer/menu/home_menu_renderer.cpp $(INCLUDE_DIR)/renderer/menu/home_menu_renderer.hpp | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/renderer/menu/font_manager.o: $(SRC_DIR)/renderer/menu/font_manager.cpp $(INCLUDE_DIR)/renderer/menu/font_manager.hpp | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
@@ -125,6 +121,18 @@ $(OBJ_DIR)/app/save_manager.o: $(SRC_DIR)/app/save_manager.cpp $(INCLUDE_DIR)/ap
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/exporter/pdf_exporter.o: $(SRC_DIR)/exporter/pdf_exporter.cpp $(INCLUDE_DIR)/exporter/pdf_exporter.hpp | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/exporter/shaper.o: $(SRC_DIR)/exporter/shaper.cpp $(INCLUDE_DIR)/exporter/shaper.hpp | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/exporter/font_cache.o: $(SRC_DIR)/exporter/font_cache.cpp $(INCLUDE_DIR)/exporter/font_cache.hpp | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/exporter/glyph_run.o: $(SRC_DIR)/exporter/glyph_run.cpp $(INCLUDE_DIR)/exporter/glyph_run.hpp | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
